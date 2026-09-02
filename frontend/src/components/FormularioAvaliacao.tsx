@@ -8,9 +8,11 @@ export interface AvaliacaoFormPayload {
   horas_dedicadas: number;
   autoavaliacao_tecnica: number;
   autoavaliacao_socioemocional: number;
-  feedback_case?: string;
-  interdependencias?: string;
-  ajustes_rota?: string;
+  feedback_case?: string | null;
+  interdependencias?: string | null;
+  ajustes_rota?: string | null;
+  link_projeto?: string;
+  link_linkedin?: string;
 }
 
 interface FormularioAvaliacaoProps {
@@ -31,6 +33,8 @@ interface FormState {
   feedback_case: string;
   interdependencias: string;
   ajustes_rota: string;
+  link_projeto: string;
+  link_linkedin: string;
 }
 
 const initialState: FormState = {
@@ -47,6 +51,8 @@ const initialState: FormState = {
   feedback_case: "",
   interdependencias: "",
   ajustes_rota: "",
+  link_projeto: "",
+  link_linkedin: "",
 };
 
 const inputClassName =
@@ -125,6 +131,12 @@ export function FormularioAvaliacao({ onSubmit }: FormularioAvaliacaoProps) {
       }
       if (form.ajustes_rota.trim()) {
         payload.ajustes_rota = form.ajustes_rota.trim();
+      }
+      if (form.link_projeto.trim()) {
+        payload.link_projeto = form.link_projeto.trim();
+      }
+      if (form.link_linkedin.trim()) {
+        payload.link_linkedin = form.link_linkedin.trim();
       }
 
       setEnviando(true);
@@ -268,6 +280,42 @@ export function FormularioAvaliacao({ onSubmit }: FormularioAvaliacaoProps) {
                 />
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Entregas e perfil profissional
+          </h3>
+
+          <div>
+            <label htmlFor="link_projeto" className={labelClassName}>
+              Link do projeto / portfólio da semana
+            </label>
+            <input
+              id="link_projeto"
+              name="link_projeto"
+              type="url"
+              value={form.link_projeto}
+              onChange={(event) => atualizarCampo("link_projeto", event.target.value)}
+              className={inputClassName}
+              placeholder="https://github.com/usuario/projeto"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="link_linkedin" className={labelClassName}>
+              Link do LinkedIn
+            </label>
+            <input
+              id="link_linkedin"
+              name="link_linkedin"
+              type="url"
+              value={form.link_linkedin}
+              onChange={(event) => atualizarCampo("link_linkedin", event.target.value)}
+              className={inputClassName}
+              placeholder="https://linkedin.com/in/seu-perfil"
+            />
           </div>
         </section>
 

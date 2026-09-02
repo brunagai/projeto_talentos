@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import Card from "./Card";
+import LinksTalento from "./LinksTalento";
 import ModalDetalheTalento from "./ModalDetalheTalento";
 import type { PerfilTalentoData } from "./PerfilTalento";
 import {
@@ -133,6 +134,18 @@ export function AbaAreas({ rankings }: AbaAreasProps) {
                       <p className="truncate text-xs text-zinc-500">
                         Semana {candidato.semana_numero}
                       </p>
+                      <div
+                        className="mt-1"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <LinksTalento
+                          linkLinkedin={candidato.link_linkedin}
+                          linkProjeto={candidato.link_projeto}
+                          tamanho="sm"
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      </div>
                     </div>
                     <span className="shrink-0 text-sm font-bold text-primary">
                       {candidato.fit_percentual.toFixed(0)}%

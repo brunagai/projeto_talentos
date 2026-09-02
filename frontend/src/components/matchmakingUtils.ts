@@ -20,6 +20,8 @@ export interface RankingCandidato {
   interdependencias?: string | null;
   ajustes_rota?: string | null;
   rituais_mentoria?: string | null;
+  link_projeto?: string | null;
+  link_linkedin?: string | null;
 }
 
 export interface CargoRankingResumo {
@@ -108,5 +110,7 @@ export function candidatoParaPerfil(
     interdependencias: candidato.interdependencias,
     ajustes_rota: candidato.ajustes_rota,
     rituais_mentoria: candidato.rituais_mentoria,
+    link_projeto: candidato.link_projeto,
+    link_linkedin: candidato.link_linkedin,
   };
 }

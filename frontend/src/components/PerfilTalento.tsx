@@ -12,4 +12,6 @@ export interface PerfilTalentoData {
   interdependencias?: string | null;
   ajustes_rota?: string | null;
   rituais_mentoria?: string | null;
+  link_projeto?: string | null;
+  link_linkedin?: string | null;
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import Card from "./Card";
+import LinksTalento from "./LinksTalento";
 import ModalDetalheTalento from "./ModalDetalheTalento";
 import type { PerfilTalentoData } from "./PerfilTalento";
 import {
@@ -109,14 +110,27 @@ export function AbaCargos({ rankings }: AbaCargosProps) {
                       onClick={() => abrirDetalhe(candidato)}
                       className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-muted"
                     >
-                      <span className="truncate text-zinc-200">
+                      <span className="min-w-0 truncate text-zinc-200">
                         <span className="font-medium text-primary">
                           {index + 1}.
                         </span>{" "}
                         {nomeExibicao(candidato)}
                       </span>
-                      <span className="shrink-0 font-semibold tabular-nums text-primary">
-                        {candidato.fit_percentual.toFixed(0)}%
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <LinksTalento
+                            linkLinkedin={candidato.link_linkedin}
+                            linkProjeto={candidato.link_projeto}
+                            tamanho="sm"
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                        </span>
+                        <span className="font-semibold tabular-nums text-primary">
+                          {candidato.fit_percentual.toFixed(0)}%
+                        </span>
                       </span>
                     </button>
                   </li>

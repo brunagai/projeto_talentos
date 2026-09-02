@@ -11,7 +11,7 @@ from app.services.matchmaking_service import (
     melhor_cargo_para_talento,
     rankear_talentos_por_cargo,
 )
-from app.services.talentos_store import listar_talentos, salvar_talentos
+from app.services.talentos_store import TalentosStoreError, listar_talentos, salvar_talentos
 
 router = APIRouter(prefix="/matchmaking", tags=["matchmaking"])
 
@@ -97,7 +97,10 @@ def _to_match_response(resultado: Any) -> MatchCandidatoResponse:
 
 
 def _talentos_do_store() -> list[TalentoMatchInput]:
-    bruto = listar_talentos()
+    try:
+        bruto = listar_talentos()
+    except TalentosStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return [TalentoMatchInput.model_validate(item) for item in bruto]
 
 
@@ -105,7 +108,7 @@ def _talentos_do_store() -> list[TalentoMatchInput]:
 def matchmaking_cargos(
     cargo_alvo: str | None = Query(
         default=None,
-        description="Se informado, ranqueia os talentos em memória para este cargo.",
+        description="Se informado, ranqueia os talentos persistidos para este cargo.",
     ),
 ) -> list[CargoResumoResponse] | RankingCargoResponse:
     """Lista cargos de referência ou ranqueia talentos para um cargo alvo."""
@@ -119,7 +122,7 @@ def matchmaking_cargos(
         talentos = _talentos_do_store()
         if not talentos:
             raise MatchmakingError(
-                "Nenhum talento em memória. Faça upload de uma planilha ou "
+                "Nenhum talento persistido. Faça upload de uma planilha ou "
                 "envie talentos via POST /matchmaking/rankear."
             )
         ranking = rankear_talentos_por_cargo(talentos, cargo_alvo)
@@ -144,6 +147,8 @@ def rankear_candidatos(
     try:
         salvar_talentos([item.model_dump() for item in payload.talentos])
         ranking = rankear_talentos_por_cargo(payload.talentos, cargo_alvo)
+    except TalentosStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except MatchmakingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

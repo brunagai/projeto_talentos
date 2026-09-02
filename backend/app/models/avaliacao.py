@@ -20,3 +20,5 @@ class AvaliacaoSemanalCreate(BaseModel):
     interdependencias: Optional[str] = None
     ajustes_rota: Optional[str] = None
     rituais_mentoria: Optional[str] = None
+    link_projeto: Optional[str] = None
+    link_linkedin: Optional[str] = None

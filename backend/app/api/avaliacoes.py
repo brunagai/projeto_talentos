@@ -10,7 +10,7 @@ from app.services.planilha_service import (
     SUPPORTED_EXTENSIONS,
     processar_planilha,
 )
-from app.services.talentos_store import salvar_talentos
+from app.services.talentos_store import TalentosStoreError, salvar_talentos
 
 router = APIRouter(prefix="/avaliacoes", tags=["avaliacoes"])
 
@@ -45,6 +45,8 @@ class PerfilTalentoResponse(BaseModel):
     interdependencias: str | None = None
     ajustes_rota: str | None = None
     rituais_mentoria: str | None = None
+    link_projeto: str | None = None
+    link_linkedin: str | None = None
 
 
 class UploadMetricasResponse(BaseModel):
@@ -130,22 +132,49 @@ async def upload_avaliacoes(arquivo: UploadFile = File(...)) -> UploadMetricasRe
             interdependencias=perfil.interdependencias,
             ajustes_rota=perfil.ajustes_rota,
             rituais_mentoria=perfil.rituais_mentoria,
+            link_projeto=perfil.link_projeto,
+            link_linkedin=perfil.link_linkedin,
         )
         for perfil in resultado.perfis
     ]
 
-    salvar_talentos(
-        [
-            {
-                "talento_id": perfil.talento_id,
-                "email": perfil.email,
-                "nome": perfil.nome,
-                "hard_skills": perfil.hard_skills,
-                "soft_skills": perfil.soft_skills,
-            }
-            for perfil in resultado.perfis
-        ]
-    )
+    avaliacoes_por_perfil = {
+        (str(avaliacao.talento_id), avaliacao.semana_numero): avaliacao
+        for avaliacao in resultado.avaliacoes
+    }
+
+    try:
+        salvar_talentos(
+            [
+                {
+                    "talento_id": perfil.talento_id,
+                    "email": perfil.email,
+                    "nome": perfil.nome,
+                    "semana_numero": perfil.semana_numero,
+                    "horas_dedicadas": (
+                        avaliacoes_por_perfil[(perfil.talento_id, perfil.semana_numero)].horas_dedicadas
+                        if (perfil.talento_id, perfil.semana_numero) in avaliacoes_por_perfil
+                        else 0.0
+                    ),
+                    "autoavaliacao_tecnica": int(round(perfil.media_tecnica)),
+                    "autoavaliacao_socioemocional": int(round(perfil.media_socioemocional)),
+                    "media_tecnica": perfil.media_tecnica,
+                    "media_socioemocional": perfil.media_socioemocional,
+                    "fit_vaga": perfil.fit_vaga,
+                    "hard_skills": perfil.hard_skills,
+                    "soft_skills": perfil.soft_skills,
+                    "feedback_case": perfil.feedback_case,
+                    "interdependencias": perfil.interdependencias,
+                    "ajustes_rota": perfil.ajustes_rota,
+                    "rituais_mentoria": perfil.rituais_mentoria,
+                    "link_projeto": perfil.link_projeto,
+                    "link_linkedin": perfil.link_linkedin,
+                }
+                for perfil in resultado.perfis
+            ]
+        )
+    except TalentosStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return UploadMetricasResponse(
         arquivo=arquivo.filename or "planilha",

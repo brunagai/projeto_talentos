@@ -83,6 +83,27 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
         "voce participou dos rituais com seus mentores nesta semana?",
         "você participou dos rituais com seus mentores nesta semana?",
     ),
+    "link_projeto": (
+        "link do projeto desenvolvido na semana",
+        "link do projeto",
+        "link projeto",
+        "link_projeto",
+        "portfolio",
+        "link do portfolio",
+        "link do portfólio",
+        "repositorio",
+        "repositório",
+        "github",
+        "url do projeto",
+    ),
+    "link_linkedin": (
+        "linkedin",
+        "link linkedin",
+        "link do linkedin",
+        "link_linkedin",
+        "perfil linkedin",
+        "url linkedin",
+    ),
 }
 
 TECH_COLUMN_NAMES: tuple[str, ...] = (
@@ -133,6 +154,8 @@ class PerfilTalentoSkills:
     interdependencias: str | None = None
     ajustes_rota: str | None = None
     rituais_mentoria: str | None = None
+    link_projeto: str | None = None
+    link_linkedin: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -394,7 +417,13 @@ def _row_to_avaliacao_e_perfil(
     if feedback_case is not None:
         payload["feedback_case"] = feedback_case
 
-    for field in ("interdependencias", "ajustes_rota", "rituais_mentoria"):
+    for field in (
+        "interdependencias",
+        "ajustes_rota",
+        "rituais_mentoria",
+        "link_projeto",
+        "link_linkedin",
+    ):
         text = _optional_text(row, column_map, field)
         if text is not None:
             payload[field] = text
@@ -428,6 +457,8 @@ def _row_to_avaliacao_e_perfil(
         interdependencias=payload.get("interdependencias"),
         ajustes_rota=payload.get("ajustes_rota"),
         rituais_mentoria=payload.get("rituais_mentoria"),
+        link_projeto=payload.get("link_projeto"),
+        link_linkedin=payload.get("link_linkedin"),
     )
     return avaliacao, perfil
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import Card from "./Card";
+import LinksTalento from "./LinksTalento";
 import ModalDetalheTalento from "./ModalDetalheTalento";
 import type { PerfilTalentoData } from "./PerfilTalento";
 
@@ -149,6 +150,17 @@ export function ListaTalentos({
                     <p className="mt-1 text-xs text-zinc-500">
                       Semana {perfil.semana_numero}
                     </p>
+                    <div
+                      className="mt-2"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <LinksTalento
+                        linkLinkedin={perfil.link_linkedin}
+                        linkProjeto={perfil.link_projeto}
+                        tamanho="sm"
+                      />
+                    </div>
                   </div>
                 </div>
 

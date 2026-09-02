@@ -68,6 +68,8 @@ function montarRankings(
           interdependencias: perfil.interdependencias,
           ajustes_rota: perfil.ajustes_rota,
           rituais_mentoria: perfil.rituais_mentoria,
+          link_projeto: perfil.link_projeto,
+          link_linkedin: perfil.link_linkedin,
         });
       }
     }

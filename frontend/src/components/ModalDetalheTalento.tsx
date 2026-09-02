@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import EvolucaoTemporal from "./EvolucaoTemporal";
+import LinksTalento from "./LinksTalento";
 import SoftSkillsRadar from "./SoftSkillsRadar";
 import type { SkillScore } from "./HardSkillsBars";
 import type { PerfilTalentoData } from "./PerfilTalento";
+
+type AbaModal = "perfil" | "evolucao";
 
 interface ModalDetalheTalentoProps {
   perfil: PerfilTalentoData;
@@ -60,6 +64,8 @@ export function ModalDetalheTalento({
   apenasDestaques = false,
   notaMinima = 4,
 }: ModalDetalheTalentoProps) {
+  const [abaAtiva, setAbaAtiva] = useState<AbaModal>("perfil");
+
   useEffect(() => {
     if (!aberto) {
       return;
@@ -78,6 +84,12 @@ export function ModalDetalheTalento({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [aberto, onClose]);
+
+  useEffect(() => {
+    if (aberto) {
+      setAbaAtiva("perfil");
+    }
+  }, [aberto, perfil.talento_id]);
 
   if (!aberto) {
     return null;
@@ -142,7 +154,7 @@ export function ModalDetalheTalento({
                 Semana {perfil.semana_numero}
                 {perfil.email ? ` · ${perfil.email}` : ""}
               </p>
-              {apenasDestaques && (
+              {apenasDestaques && abaAtiva === "perfil" && (
                 <p className="mt-1 text-xs font-medium text-primary">
                   Destaques · competências com nota ≥ {notaMinima.toFixed(1)}
                 </p>
@@ -159,97 +171,144 @@ export function ModalDetalheTalento({
           </button>
         </header>
 
+        {(perfil.link_linkedin || perfil.link_projeto) && abaAtiva === "perfil" && (
+          <div className="border-b border-card-elevated bg-card px-5 py-3">
+            <LinksTalento
+              linkLinkedin={perfil.link_linkedin}
+              linkProjeto={perfil.link_projeto}
+            />
+          </div>
+        )}
+
+        <nav
+          aria-label="Seções do perfil"
+          className="flex border-b border-card-elevated bg-card px-5"
+        >
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("perfil")}
+            aria-pressed={abaAtiva === "perfil"}
+            className={[
+              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              abaAtiva === "perfil"
+                ? "border-primary text-primary"
+                : "border-transparent text-zinc-400 hover:text-zinc-200",
+            ].join(" ")}
+          >
+            Perfil atual
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("evolucao")}
+            aria-pressed={abaAtiva === "evolucao"}
+            className={[
+              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              abaAtiva === "evolucao"
+                ? "border-primary text-primary"
+                : "border-transparent text-zinc-400 hover:text-zinc-200",
+            ].join(" ")}
+          >
+            Evolução temporal
+          </button>
+        </nav>
+
         <div className="overflow-y-auto px-5 py-5">
-          <dl className="mb-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-card-elevated bg-surface-muted p-3">
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">
-                Média técnica
-              </dt>
-              <dd className="mt-1 text-xl font-bold text-white">
-                {mediaTecnica.toFixed(2)}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-card-elevated bg-surface-muted p-3">
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">
-                Média socioemocional
-              </dt>
-              <dd className="mt-1 text-xl font-bold text-white">
-                {mediaSocio.toFixed(2)}
-              </dd>
-            </div>
-            <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-              <dt className="text-xs uppercase tracking-wide text-primary/80">
-                Fit com a vaga
-              </dt>
-              <dd className="mt-1 text-xl font-bold text-primary">
-                {fitVaga.toFixed(2)}
-              </dd>
-            </div>
-          </dl>
-
-          {apenasDestaques && hardSkills.length === 0 && softSkills.length === 0 ? (
-            <div className="rounded-xl border border-card-elevated bg-surface p-6 text-center">
-              <p className="text-sm text-zinc-300">
-                Nenhuma competência com nota ≥ {notaMinima.toFixed(1)} neste
-                registro.
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                Abra o perfil na aba Talentos para ver o detalhamento completo.
-              </p>
-            </div>
+          {abaAtiva === "evolucao" ? (
+            <EvolucaoTemporal talentoId={perfil.talento_id} />
           ) : (
-            <div className="grid gap-6 xl:grid-cols-2">
-              <SoftSkillsRadar
-                skills={hardSkills}
-                titulo={
-                  apenasDestaques
-                    ? "Destaques Técnicos"
-                    : "Radar de Competências Técnicas"
-                }
-                descricao={
-                  apenasDestaques
-                    ? `Hard skills com pontuação ≥ ${notaMinima.toFixed(1)}.`
-                    : "Hard skills na escala 1–5 convertidas das respostas da planilha."
-                }
-                className="bg-surface"
-              />
-              <SoftSkillsRadar
-                skills={softSkills}
-                titulo={
-                  apenasDestaques
-                    ? "Destaques Socioemocionais"
-                    : "Radar Socioemocional"
-                }
-                descricao={
-                  apenasDestaques
-                    ? `Soft skills com pontuação ≥ ${notaMinima.toFixed(1)}.`
-                    : "Soft skills na escala 1–5 convertidas das respostas da planilha."
-                }
-                className="bg-surface"
-              />
-            </div>
-          )}
+            <>
+              <dl className="mb-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-card-elevated bg-surface-muted p-3">
+                  <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                    Média técnica
+                  </dt>
+                  <dd className="mt-1 text-xl font-bold text-white">
+                    {mediaTecnica.toFixed(2)}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-card-elevated bg-surface-muted p-3">
+                  <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                    Média socioemocional
+                  </dt>
+                  <dd className="mt-1 text-xl font-bold text-white">
+                    {mediaSocio.toFixed(2)}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
+                  <dt className="text-xs uppercase tracking-wide text-primary/80">
+                    Fit com a vaga
+                  </dt>
+                  <dd className="mt-1 text-xl font-bold text-primary">
+                    {fitVaga.toFixed(2)}
+                  </dd>
+                </div>
+              </dl>
 
-          <section className="mt-6">
-            <h3 className="mb-3 text-lg font-semibold text-primary">
-              Insights qualitativos
-            </h3>
-            {temInsights ? (
-              <div className="grid gap-3">
-                {insights.map((item) => (
-                  <InsightBlock
-                    key={item.titulo}
-                    titulo={item.titulo}
-                    texto={item.texto}
+              {apenasDestaques && hardSkills.length === 0 && softSkills.length === 0 ? (
+                <div className="rounded-xl border border-card-elevated bg-surface p-6 text-center">
+                  <p className="text-sm text-zinc-300">
+                    Nenhuma competência com nota ≥ {notaMinima.toFixed(1)} neste
+                    registro.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Abra o perfil na aba Talentos para ver o detalhamento completo.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <SoftSkillsRadar
+                    skills={hardSkills}
+                    titulo={
+                      apenasDestaques
+                        ? "Destaques Técnicos"
+                        : "Radar de Competências Técnicas"
+                    }
+                    descricao={
+                      apenasDestaques
+                        ? `Hard skills com pontuação ≥ ${notaMinima.toFixed(1)}.`
+                        : "Hard skills na escala 1–5 convertidas das respostas da planilha."
+                    }
+                    className="bg-surface"
                   />
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-card-elevated bg-surface-muted p-4 text-sm text-zinc-400">
-                Nenhum insight qualitativo informado neste registro.
-              </p>
-            )}
-          </section>
+                  <SoftSkillsRadar
+                    skills={softSkills}
+                    titulo={
+                      apenasDestaques
+                        ? "Destaques Socioemocionais"
+                        : "Radar Socioemocional"
+                    }
+                    descricao={
+                      apenasDestaques
+                        ? `Soft skills com pontuação ≥ ${notaMinima.toFixed(1)}.`
+                        : "Soft skills na escala 1–5 convertidas das respostas da planilha."
+                    }
+                    className="bg-surface"
+                  />
+                </div>
+              )}
+
+              <section className="mt-6">
+                <h3 className="mb-3 text-lg font-semibold text-primary">
+                  Insights qualitativos
+                </h3>
+                {temInsights ? (
+                  <div className="grid gap-3">
+                    {insights.map((item) => (
+                      <InsightBlock
+                        key={item.titulo}
+                        titulo={item.titulo}
+                        texto={item.texto}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-card-elevated bg-surface-muted p-4 text-sm text-zinc-400">
+                    Nenhum insight qualitativo informado neste registro.
+                  </p>
+                )}
+              </section>
+            </>
+          )}
         </div>
       </div>
     </div>
