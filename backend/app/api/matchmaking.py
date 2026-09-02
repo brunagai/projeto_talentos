@@ -1,0 +1,177 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.services.cargos_referencia import CARGOS_REFERENCIA
+from app.services.matchmaking_service import (
+    MatchmakingError,
+    melhor_cargo_para_talento,
+    rankear_talentos_por_cargo,
+)
+from app.services.talentos_store import listar_talentos, salvar_talentos
+
+router = APIRouter(prefix="/matchmaking", tags=["matchmaking"])
+
+
+class CargoResumoResponse(BaseModel):
+    cargo: str
+    area: str
+    pesos: dict[str, int]
+
+
+class TalentoMatchInput(BaseModel):
+    talento_id: str
+    email: str | None = None
+    nome: str | None = None
+    hard_skills: dict[str, int] = Field(default_factory=dict)
+    soft_skills: dict[str, int] = Field(default_factory=dict)
+
+
+class CompetenciaMatchResponse(BaseModel):
+    competencia: str
+    tipo: str
+    nota_candidato: int
+    peso_exigido: int
+    atende_corte: bool
+    gap: int
+
+
+class MatchCandidatoResponse(BaseModel):
+    talento_id: str
+    nome: str | None = None
+    email: str | None = None
+    cargo_alvo: str
+    area: str
+    fit_percentual: float
+    similaridade_cosseno: float
+    competencias_atendem: list[CompetenciaMatchResponse]
+    competencias_desenvolvimento: list[CompetenciaMatchResponse]
+
+
+class RankingCargoResponse(BaseModel):
+    cargo_alvo: str
+    area: str
+    total_candidatos: int
+    ranking: list[MatchCandidatoResponse]
+
+
+class RankearRequest(BaseModel):
+    talentos: list[TalentoMatchInput]
+
+
+def _to_match_response(resultado: Any) -> MatchCandidatoResponse:
+    return MatchCandidatoResponse(
+        talento_id=resultado.talento_id,
+        nome=resultado.nome,
+        email=resultado.email,
+        cargo_alvo=resultado.cargo_alvo,
+        area=resultado.area,
+        fit_percentual=resultado.fit_percentual,
+        similaridade_cosseno=resultado.similaridade_cosseno,
+        competencias_atendem=[
+            CompetenciaMatchResponse(
+                competencia=item.competencia,
+                tipo=item.tipo,
+                nota_candidato=item.nota_candidato,
+                peso_exigido=item.peso_exigido,
+                atende_corte=item.atende_corte,
+                gap=item.gap,
+            )
+            for item in resultado.competencias_atendem
+        ],
+        competencias_desenvolvimento=[
+            CompetenciaMatchResponse(
+                competencia=item.competencia,
+                tipo=item.tipo,
+                nota_candidato=item.nota_candidato,
+                peso_exigido=item.peso_exigido,
+                atende_corte=item.atende_corte,
+                gap=item.gap,
+            )
+            for item in resultado.competencias_desenvolvimento
+        ],
+    )
+
+
+def _talentos_do_store() -> list[TalentoMatchInput]:
+    bruto = listar_talentos()
+    return [TalentoMatchInput.model_validate(item) for item in bruto]
+
+
+@router.get("/cargos", response_model=list[CargoResumoResponse] | RankingCargoResponse)
+def matchmaking_cargos(
+    cargo_alvo: str | None = Query(
+        default=None,
+        description="Se informado, ranqueia os talentos em memória para este cargo.",
+    ),
+) -> list[CargoResumoResponse] | RankingCargoResponse:
+    """Lista cargos de referência ou ranqueia talentos para um cargo alvo."""
+    if cargo_alvo is None:
+        return [
+            CargoResumoResponse(cargo=cargo.cargo, area=cargo.area, pesos=cargo.pesos)
+            for cargo in CARGOS_REFERENCIA
+        ]
+
+    try:
+        talentos = _talentos_do_store()
+        if not talentos:
+            raise MatchmakingError(
+                "Nenhum talento em memória. Faça upload de uma planilha ou "
+                "envie talentos via POST /matchmaking/rankear."
+            )
+        ranking = rankear_talentos_por_cargo(talentos, cargo_alvo)
+    except MatchmakingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    primeiro = ranking[0]
+    return RankingCargoResponse(
+        cargo_alvo=primeiro.cargo_alvo,
+        area=primeiro.area,
+        total_candidatos=len(ranking),
+        ranking=[_to_match_response(item) for item in ranking],
+    )
+
+
+@router.post("/rankear", response_model=RankingCargoResponse)
+def rankear_candidatos(
+    payload: RankearRequest,
+    cargo_alvo: str = Query(..., description="Cargo alvo da matriz de referência."),
+) -> RankingCargoResponse:
+    """Ranqueia talentos enviados no body pelo Fit % com o cargo selecionado."""
+    try:
+        salvar_talentos([item.model_dump() for item in payload.talentos])
+        ranking = rankear_talentos_por_cargo(payload.talentos, cargo_alvo)
+    except MatchmakingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    primeiro = ranking[0]
+    return RankingCargoResponse(
+        cargo_alvo=primeiro.cargo_alvo,
+        area=primeiro.area,
+        total_candidatos=len(ranking),
+        ranking=[_to_match_response(item) for item in ranking],
+    )
+
+
+@router.post("/recomendar-cargos", response_model=list[MatchCandidatoResponse])
+def recomendar_cargos_para_talento(
+    talento: TalentoMatchInput,
+    top_n: int = Query(default=3, ge=1, le=16),
+) -> list[MatchCandidatoResponse]:
+    """Sugere os cargos com maior Fit % para um único talento."""
+    try:
+        resultados = melhor_cargo_para_talento(
+            talento.hard_skills,
+            talento.soft_skills,
+            talento_id=talento.talento_id,
+            nome=talento.nome,
+            email=talento.email,
+            top_n=top_n,
+        )
+    except MatchmakingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return [_to_match_response(item) for item in resultados]
