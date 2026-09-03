@@ -121,6 +121,7 @@ export function UploadPlanilha() {
         <div
           role="button"
           tabIndex={0}
+          aria-label="Selecionar ou soltar planilha CSV ou XLSX"
           onClick={() => inputRef.current?.click()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {

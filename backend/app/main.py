@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,25 +10,28 @@ from app.api.gestor import router as gestor_router
 from app.api.health import router as health_router
 from app.api.matchmaking import router as matchmaking_router
 from app.api.talentos import router as talentos_router
-from app.core.database import get_supabase
 from app.core.config import settings
+from app.core.database import get_supabase
 from app.exceptions import registrar_exception_handlers
-from app.services.auth_store import garantir_organizacao_padrao, garantir_usuarios_demo
+from app.services.auth_store import garantir_organizacao_padrao
 from app.services.talentos_store import garantir_turma_padrao
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Valida conexão com Supabase e garante dados iniciais na inicialização."""
+    """Valida conexão com Supabase e garante org/turma padrão na inicialização."""
     client = get_supabase()
     client.table("turmas").select("id").limit(1).execute()
     try:
         organizacao_id = garantir_organizacao_padrao()
-        turma_id = garantir_turma_padrao(organizacao_id=organizacao_id)
-        if settings.ENVIRONMENT.lower() not in ("production", "prod"):
-            garantir_usuarios_demo(turma_id=turma_id, organizacao_id=organizacao_id)
+        garantir_turma_padrao(organizacao_id=organizacao_id)
     except Exception:
-        pass
+        logger.exception(
+            "Falha ao garantir organização/turma padrão no startup. "
+            "A API sobe, mas dados iniciais podem estar incompletos."
+        )
     yield
 
 
@@ -40,13 +44,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 registrar_exception_handlers(app)

@@ -13,36 +13,30 @@ from app.core.database import get_supabase
 ORGANIZACAO_PADRAO_SLUG = "cobra-coral"
 ORGANIZACAO_PADRAO_NOME = "Cobra Coral Consultoria"
 
-USUARIOS_DEMO = [
-    {
-        "email": "admin@cobra-coral.com",
-        "senha": "admin123",
-        "nome": "Administrador",
-        "papel": "admin",
-    },
-    {
-        "email": "recrutador@cobra-coral.com",
-        "senha": "recrutador123",
-        "nome": "Recrutador Demo",
-        "papel": "recrutador",
-    },
-    {
-        "email": "mentor@cobra-coral.com",
-        "senha": "mentor123",
-        "nome": "Mentor Demo",
-        "papel": "mentor",
-    },
-    {
-        "email": "talento@cobra-coral.com",
-        "senha": "talento123",
-        "nome": "Talento Demo",
-        "papel": "talento",
-    },
-]
-
 
 class AuthStoreError(RuntimeError):
     """Erro ao autenticar ou consultar usuários."""
+
+    status_code: int = 503
+    code: str = "service_unavailable"
+    public_message: str = "Erro ao acessar o banco de dados."
+
+    def __init__(self, message: str, *, public_message: str | None = None) -> None:
+        super().__init__(message)
+        if public_message is not None:
+            self.public_message = public_message
+
+
+class AuthNotFoundError(AuthStoreError):
+    status_code = 404
+    code = "not_found"
+    public_message = "Recurso não encontrado."
+
+
+class AuthValidationError(AuthStoreError):
+    status_code = 400
+    code = "validation_error"
+    public_message = "Dados inválidos."
 
 
 def _executar(operacao: str, callback: Any) -> Any:
@@ -100,10 +94,16 @@ def validar_turma_na_organizacao(turma_id: str, organizacao_id: str) -> None:
         .execute(),
     )
     if not resultado.data:
-        raise AuthStoreError("Turma não encontrada.")
+        raise AuthNotFoundError(
+            "Turma não encontrada.",
+            public_message="Turma não encontrada.",
+        )
     turma = resultado.data[0]
     if turma.get("organizacao_id") and str(turma["organizacao_id"]) != organizacao_id:
-        raise AuthStoreError("Turma não pertence à organização do usuário.")
+        raise AuthValidationError(
+            "Turma não pertence à organização do usuário.",
+            public_message="Turma não pertence à organização do usuário.",
+        )
 
 
 def _usuario_com_organizacao(row: dict[str, Any]) -> dict[str, Any]:
@@ -160,11 +160,26 @@ def autenticar_usuario(email: str, senha: str) -> dict[str, Any] | None:
     return usuario
 
 
-def garantir_usuarios_demo(turma_id: str, organizacao_id: str) -> None:
-    """Cria usuários demo se ainda não existirem."""
+def garantir_usuarios_demo(
+    turma_id: str,
+    organizacao_id: str,
+    *,
+    usuarios: list[dict[str, str]],
+) -> None:
+    """Cria usuários fornecidos se ainda não existirem.
+
+    Destinado ao script CLI `scripts/seed_demo.py` — não use no boot da API.
+    """
+    if not usuarios:
+        raise AuthValidationError(
+            "Lista de usuários demo vazia.",
+            public_message="Lista de usuários demo vazia.",
+        )
+
+    validar_turma_na_organizacao(turma_id, organizacao_id)
     client = get_supabase()
 
-    for demo in USUARIOS_DEMO:
+    for demo in usuarios:
         existente = _executar(
             f"verificar usuário {demo['email']}",
             lambda email=demo["email"]: client.table("usuarios")

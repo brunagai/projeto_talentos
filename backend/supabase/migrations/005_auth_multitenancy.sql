@@ -172,4 +172,4 @@ CREATE TRIGGER usuarios_set_updated_at
     BEFORE UPDATE ON usuarios
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- Usuários demo são criados pelo backend em runtime (garantir_usuarios_demo).
+-- Usuários demo: criar manualmente via `python -m scripts.seed_demo` (não no boot da API).

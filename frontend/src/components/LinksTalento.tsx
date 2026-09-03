@@ -7,10 +7,20 @@ export function normalizarUrl(url: string): string {
   if (!trimmed) {
     return "";
   }
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
+
+  const candidata = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(candidata);
+    if (parsed.protocol !== "https:") {
+      return "";
+    }
+    return parsed.toString();
+  } catch {
+    return "";
   }
-  return `https://${trimmed}`;
 }
 
 interface LinksTalentoProps {
@@ -60,7 +70,10 @@ export function LinksTalento({
   const projeto = linkProjeto?.trim();
   const linkedin = linkLinkedin?.trim();
 
-  if (!projeto && !linkedin) {
+  const projetoUrl = projeto ? normalizarUrl(projeto) : "";
+  const linkedinUrl = linkedin ? normalizarUrl(linkedin) : "";
+
+  if (!projetoUrl && !linkedinUrl) {
     return null;
   }
 
@@ -72,9 +85,9 @@ export function LinksTalento({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {linkedin && (
+      {linkedinUrl && (
         <a
-          href={normalizarUrl(linkedin)}
+          href={linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClick}
@@ -86,9 +99,9 @@ export function LinksTalento({
           {tamanho === "md" && <span>LinkedIn</span>}
         </a>
       )}
-      {projeto && (
+      {projetoUrl && (
         <a
-          href={normalizarUrl(projeto)}
+          href={projetoUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClick}

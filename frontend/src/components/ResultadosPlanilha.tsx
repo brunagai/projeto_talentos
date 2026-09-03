@@ -6,6 +6,7 @@ import AbaAreas from "./AbaAreas";
 import AbaCargos from "./AbaCargos";
 import Card from "./Card";
 import ListaTalentos from "./ListaTalentos";
+import { AlertErro } from "./AlertErro";
 import type { PerfilTalentoData } from "./PerfilTalento";
 import {
   LIMIAR_ADERENCIA,
@@ -221,7 +222,7 @@ export function ResultadosPlanilha({
             )}
             {erroCargos && (
               <Card className="w-full border-primary/40">
-                <p className="text-sm text-primary">{erroCargos}</p>
+                <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
               </Card>
             )}
             {!carregandoCargos && !erroCargos && (
@@ -242,7 +243,7 @@ export function ResultadosPlanilha({
             )}
             {erroCargos && (
               <Card className="w-full border-primary/40">
-                <p className="text-sm text-primary">{erroCargos}</p>
+                <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
               </Card>
             )}
           </>

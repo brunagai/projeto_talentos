@@ -10,28 +10,26 @@ async def tratar_app_error(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
 
 
-def _mensagem_store(exc: Exception) -> str:
-    return str(exc) if str(exc) else "Erro ao acessar o banco de dados."
+def _mensagem_publica(exc: Exception) -> str:
+    public = getattr(exc, "public_message", None)
+    if isinstance(public, str) and public.strip():
+        return public
+    return "Erro ao acessar o banco de dados."
 
 
-def _status_store(exc: Exception) -> int:
-    mensagem = str(exc).lower()
-    if "não encontrad" in mensagem or "nao encontrad" in mensagem:
-        return 404
-    if any(
-        termo in mensagem
-        for termo in ("planilha", "duplicat", "conflito", "inválido", "invalido")
-    ):
-        return 400
-    return 503
+def _status_e_codigo(exc: Exception) -> tuple[int, str]:
+    status = getattr(exc, "status_code", None)
+    code = getattr(exc, "code", None)
+    if isinstance(status, int) and isinstance(code, str):
+        return status, code
+    return 503, "service_unavailable"
 
 
 async def tratar_store_error(_: Request, exc: Exception) -> JSONResponse:
-    status = _status_store(exc)
-    code = "not_found" if status == 404 else "service_unavailable"
+    status, code = _status_e_codigo(exc)
     return JSONResponse(
         status_code=status,
-        content={"code": code, "message": _mensagem_store(exc)},
+        content={"code": code, "message": _mensagem_publica(exc)},
     )
 
 

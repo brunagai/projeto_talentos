@@ -1,7 +1,7 @@
 "use client";
 
 import Card from "./Card";
-import type { SkillScore } from "./HardSkillsBars";
+import type { SkillScore } from "./skillTypes";
 
 interface SoftSkillsRadarProps {
   skills: SkillScore[];

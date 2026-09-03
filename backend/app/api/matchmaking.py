@@ -12,7 +12,7 @@ from app.services.matchmaking_service import (
     melhor_cargo_para_talento,
     rankear_talentos_por_cargo,
 )
-from app.services.talentos_store import TalentosStoreError, listar_talentos, salvar_talentos
+from app.services.talentos_store import TalentosStoreError, listar_talentos
 
 router = APIRouter(prefix="/matchmaking", tags=["matchmaking"])
 
@@ -97,12 +97,20 @@ def _to_match_response(resultado: Any) -> MatchCandidatoResponse:
     )
 
 
-def _talentos_do_store(usuario: UsuarioAutenticado) -> list[TalentoMatchInput]:
+def _talentos_do_store(
+    usuario: UsuarioAutenticado,
+    *,
+    page: int = 1,
+    page_size: int | None = None,
+) -> list[TalentoMatchInput]:
     try:
         turma_id = resolver_turma_id(usuario)
-        bruto = listar_talentos(turma_id=turma_id)
+        bruto = listar_talentos(turma_id=turma_id, page=page, page_size=page_size)
     except TalentosStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 503),
+            detail=getattr(exc, "public_message", str(exc)),
+        ) from exc
     return [TalentoMatchInput.model_validate(item) for item in bruto]
 
 
@@ -112,6 +120,8 @@ def matchmaking_cargos(
         default=None,
         description="Se informado, ranqueia os talentos persistidos para este cargo.",
     ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
     usuario: Annotated[
         UsuarioAutenticado,
         Depends(
@@ -127,7 +137,7 @@ def matchmaking_cargos(
         ]
 
     try:
-        talentos = _talentos_do_store(usuario)
+        talentos = _talentos_do_store(usuario, page=page, page_size=page_size)
         if not talentos:
             raise MatchmakingError(
                 "Nenhum talento persistido. Faça upload de uma planilha ou "
@@ -150,18 +160,17 @@ def matchmaking_cargos(
 def rankear_candidatos(
     payload: RankearRequest,
     cargo_alvo: str = Query(..., description="Cargo alvo da matriz de referência."),
-    usuario: Annotated[
+    _: Annotated[
         UsuarioAutenticado,
         Depends(exigir_papeis(Papel.ADMIN, Papel.RECRUTADOR)),
     ] = None,
 ) -> RankingCargoResponse:
-    """Ranqueia talentos enviados no body pelo Fit % com o cargo selecionado."""
+    """Ranqueia talentos enviados no body pelo Fit % com o cargo selecionado.
+
+    Operação pura: não persiste talentos. Use POST /avaliacoes/upload para salvar.
+    """
     try:
-        turma_id = resolver_turma_id(usuario)
-        salvar_talentos([item.model_dump() for item in payload.talentos], turma_id=turma_id)
         ranking = rankear_talentos_por_cargo(payload.talentos, cargo_alvo)
-    except TalentosStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except MatchmakingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

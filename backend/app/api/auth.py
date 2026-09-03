@@ -51,7 +51,7 @@ def _definir_cookie_sessao(response: Response, token: str) -> None:
         key=settings.AUTH_COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=settings.cookie_secure_enabled,
         samesite="lax",
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
@@ -75,7 +75,10 @@ def login(
     try:
         usuario = autenticar_usuario(payload.email, payload.senha)
     except AuthStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 503),
+            detail=getattr(exc, "public_message", "Erro ao autenticar."),
+        ) from exc
 
     if usuario is None:
         raise HTTPException(
@@ -95,7 +98,7 @@ def logout(response: Response) -> dict[str, bool]:
         key=settings.AUTH_COOKIE_NAME,
         path="/",
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=settings.cookie_secure_enabled,
         samesite="lax",
     )
     return {"ok": True}

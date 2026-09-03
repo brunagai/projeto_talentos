@@ -1,5 +1,7 @@
 from typing import Annotated, Literal, Union
 
+import asyncio
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -126,8 +128,15 @@ async def upload_avaliacoes(
         )
 
     try:
-        resultado = processar_planilha(arquivo.filename or "planilha", conteudo)
-        metricas = MetricasService.calcular_agregadas(resultado.avaliacoes)
+        resultado = await asyncio.to_thread(
+            processar_planilha,
+            arquivo.filename or "planilha",
+            conteudo,
+        )
+        metricas = await asyncio.to_thread(
+            MetricasService.calcular_agregadas,
+            resultado.avaliacoes,
+        )
     except PlanilhaProcessingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except MetricasCalculationError as exc:
@@ -160,7 +169,8 @@ async def upload_avaliacoes(
     }
 
     turma_id = resolver_turma_id(usuario)
-    salvar_talentos(
+    await asyncio.to_thread(
+        salvar_talentos,
         [
             {
                 "talento_id": perfil.talento_id,

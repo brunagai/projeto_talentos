@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import Card from "./Card";
 import LinksTalento from "./LinksTalento";
+import { AlertErro } from "./AlertErro";
 import type { HistoricoTalento, SemanaHistorico, VariacaoCompetencia } from "./historicoTypes";
 import SoftSkillsRadar from "./SoftSkillsRadar";
 import { apiFetch } from "../lib/api";
@@ -303,9 +304,9 @@ export function EvolucaoTemporal({ talentoId }: EvolucaoTemporalProps) {
 
   if (erro) {
     return (
-      <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+      <AlertErro className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
         {erro}
-      </p>
+      </AlertErro>
     );
   }
 

@@ -18,6 +18,21 @@ from app.core.database import get_supabase
 class GestorStoreError(RuntimeError):
     """Erro ao persistir ou consultar avaliações do gestor."""
 
+    status_code: int = 503
+    code: str = "service_unavailable"
+    public_message: str = "Erro ao acessar o banco de dados."
+
+    def __init__(self, message: str, *, public_message: str | None = None) -> None:
+        super().__init__(message)
+        if public_message is not None:
+            self.public_message = public_message
+
+
+class GestorNotFoundError(GestorStoreError):
+    status_code = 404
+    code = "not_found"
+    public_message = "Recurso não encontrado."
+
 
 def _calcular_medias(
     hard_skills: dict[str, int],
@@ -171,7 +186,10 @@ def _buscar_autopercepcao_semana(
         .execute(),
     )
     if not talento.data:
-        raise GestorStoreError("Talento não encontrado.")
+        raise GestorNotFoundError(
+            "Talento não encontrado.",
+            public_message="Talento não encontrado.",
+        )
 
     talento_info = talento.data[0]
     avaliacao = _executar(

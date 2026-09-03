@@ -21,12 +21,36 @@ logger = logging.getLogger(__name__)
 class TalentosStoreError(RuntimeError):
     """Erro ao persistir ou consultar talentos no Supabase."""
 
+    status_code: int = 503
+    code: str = "service_unavailable"
+    public_message: str = "Erro ao acessar o banco de dados."
+
+    def __init__(self, message: str, *, public_message: str | None = None) -> None:
+        super().__init__(message)
+        if public_message is not None:
+            self.public_message = public_message
+
+
+class TalentosNotFoundError(TalentosStoreError):
+    status_code = 404
+    code = "not_found"
+    public_message = "Recurso não encontrado."
+
+
+class TalentosValidationError(TalentosStoreError):
+    status_code = 400
+    code = "validation_error"
+    public_message = "Dados inválidos."
+
 
 def _validar_uuid(valor: str, campo: str = "id") -> str:
     try:
         return str(UUID(str(valor)))
     except (ValueError, TypeError) as exc:
-        raise TalentosStoreError(f"{campo} inválido: {valor}") from exc
+        raise TalentosValidationError(
+            f"{campo} inválido: {valor}",
+            public_message=f"{campo} inválido.",
+        ) from exc
 
 
 def _executar(operacao: str, callback: Any) -> Any:
@@ -456,8 +480,14 @@ def salvar_talentos(
 def listar_talentos(
     turma_id: str | None = None,
     semana_numero: int | None = None,
+    *,
+    page: int = 1,
+    page_size: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Lista talentos da turma. Com semana, retorna perfis da avaliação correspondente."""
+    """Lista talentos da turma. Com semana, retorna perfis da avaliação correspondente.
+
+    Paginação opcional via page/page_size (1-based). Sem page_size, retorna todos.
+    """
     client = get_supabase()
     turma_resolvida = _obter_turma_id(turma_id)
 
@@ -475,7 +505,7 @@ def listar_talentos(
             talento_info = row.get("talentos") or {}
             perfil = _avaliacao_para_resposta(row, talento_info)
             resultado.append(perfil)
-        return resultado
+        return _aplicar_paginacao(resultado, page=page, page_size=page_size)
 
     talentos = _executar(
         "listar talentos por turma",
@@ -484,7 +514,73 @@ def listar_talentos(
         .eq("turma_id", turma_resolvida)
         .execute(),
     )
-    return [_talento_para_resposta(row) for row in talentos.data or []]
+    itens = [_talento_para_resposta(row) for row in talentos.data or []]
+    return _aplicar_paginacao(itens, page=page, page_size=page_size)
+
+
+def _aplicar_paginacao(
+    itens: list[dict[str, Any]],
+    *,
+    page: int,
+    page_size: int | None,
+) -> list[dict[str, Any]]:
+    if page_size is None:
+        return itens
+    pagina = max(1, page)
+    tamanho = max(1, min(page_size, 100))
+    inicio = (pagina - 1) * tamanho
+    return itens[inicio : inicio + tamanho]
+
+
+def buscar_perfil_semana_talento(
+    talento_id: str,
+    semana_numero: int,
+    turma_id: str | None = None,
+) -> dict[str, Any] | None:
+    """Retorna metadados do talento + perfil de uma semana específica."""
+    client = get_supabase()
+    talento_uuid = _validar_uuid(talento_id, "talento_id")
+    turma_resolvida = _obter_turma_id(turma_id)
+
+    talento = _executar(
+        "buscar talento para PDI/semana",
+        lambda: client.table("talentos")
+        .select("*")
+        .eq("id", talento_uuid)
+        .eq("turma_id", turma_resolvida)
+        .limit(1)
+        .execute(),
+    )
+    if not talento.data:
+        return None
+
+    registro_talento = talento.data[0]
+    avaliacao = _executar(
+        "buscar avaliação semanal do talento",
+        lambda: client.table("avaliacoes_semanais")
+        .select("*")
+        .eq("talento_id", talento_uuid)
+        .eq("turma_id", turma_resolvida)
+        .eq("semana_numero", semana_numero)
+        .limit(1)
+        .execute(),
+    )
+    if not avaliacao.data:
+        return {
+            "talento_id": str(registro_talento["id"]),
+            "nome": registro_talento.get("nome"),
+            "email": registro_talento.get("email"),
+            "turma_id": str(registro_talento["turma_id"]),
+            "perfil_semana": None,
+        }
+
+    return {
+        "talento_id": str(registro_talento["id"]),
+        "nome": registro_talento.get("nome"),
+        "email": registro_talento.get("email"),
+        "turma_id": str(registro_talento["turma_id"]),
+        "perfil_semana": _avaliacao_para_resposta(avaliacao.data[0], registro_talento),
+    }
 
 
 def listar_historico_talento(
@@ -575,11 +671,21 @@ def buscar_talento_por_id(
     return _avaliacao_para_resposta(avaliacao.data[0], registro_talento)
 
 
-def limpar_talentos(turma_id: str | None = None) -> None:
-    """Remove talentos (e avaliações em cascata) de uma turma."""
+def limpar_talentos(
+    turma_id: str,
+    *,
+    organizacao_id: str,
+) -> None:
+    """Remove talentos (e avaliações em cascata) de uma turma.
+
+    Somente para scripts internos de manutenção. Não expor via API HTTP.
+    Exige organizacao_id e valida que a turma pertence à organização.
+    """
+    from app.services.auth_store import validar_turma_na_organizacao
+
+    validar_turma_na_organizacao(turma_id, organizacao_id)
     client = get_supabase()
-    turma_resolvida = _obter_turma_id(turma_id)
     _executar(
         "limpar talentos da turma",
-        lambda: client.table("talentos").delete().eq("turma_id", turma_resolvida).execute(),
+        lambda: client.table("talentos").delete().eq("turma_id", turma_id).execute(),
     )

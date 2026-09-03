@@ -24,7 +24,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (carregando) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        aria-busy="true"
+        role="status"
+      >
         <p className="text-sm text-zinc-400">Carregando sessão…</p>
       </div>
     );

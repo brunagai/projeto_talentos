@@ -104,12 +104,15 @@ export function AbaCargos({ rankings }: AbaCargosProps) {
                 {listaCompleta.map((candidato, index) => (
                   <li
                     key={`${item.cargo}-${candidato.talento_id}-${candidato.semana_numero}`}
+                    className="relative"
                   >
                     <button
                       type="button"
                       onClick={() => abrirDetalhe(candidato)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-muted"
-                    >
+                      className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      aria-label={`Ver detalhes de ${nomeExibicao(candidato)}`}
+                    />
+                    <div className="pointer-events-none relative z-10 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm">
                       <span className="min-w-0 truncate text-zinc-200">
                         <span className="font-medium text-primary">
                           {index + 1}.
@@ -117,22 +120,18 @@ export function AbaCargos({ rankings }: AbaCargosProps) {
                         {nomeExibicao(candidato)}
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
-                        <span
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        >
+                        <span className="pointer-events-auto">
                           <LinksTalento
                             linkLinkedin={candidato.link_linkedin}
                             linkProjeto={candidato.link_projeto}
                             tamanho="sm"
-                            onClick={(event) => event.stopPropagation()}
                           />
                         </span>
                         <span className="font-semibold tabular-nums text-primary">
                           {candidato.fit_percentual.toFixed(0)}%
                         </span>
                       </span>
-                    </button>
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -141,6 +140,7 @@ export function AbaCargos({ rankings }: AbaCargosProps) {
                 <button
                   type="button"
                   onClick={() => toggleExpandido(item.cargo)}
+                  aria-expanded={expandido}
                   className="mt-4 rounded-lg border border-card-elevated px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:border-primary/40 hover:text-primary"
                 >
                   {expandido

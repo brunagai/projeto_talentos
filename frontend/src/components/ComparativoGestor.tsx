@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Card from "./Card";
 import FormularioGestor from "./FormularioGestor";
 import RadarComparativo from "./RadarComparativo";
+import { AlertErro } from "./AlertErro";
 import type { ComparativoGestorData } from "./comparativoTypes";
 import { HARD_SKILL_KEYS, SOFT_SKILL_KEYS } from "./competencias";
 import { apiFetch } from "../lib/api";
@@ -80,9 +81,9 @@ export function ComparativoGestor({
 
   if (erro) {
     return (
-      <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+      <AlertErro className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
         {erro}
-      </p>
+      </AlertErro>
     );
   }
 

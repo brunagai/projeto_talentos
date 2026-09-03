@@ -128,14 +128,19 @@ export function ListaTalentos({
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {paginaItens.map((perfil) => {
             const nome = perfil.nome || "Sem nome";
+            const cardKey = `${perfil.talento_id}-${perfil.semana_numero}-${perfil.email ?? ""}`;
             return (
-              <button
-                key={`${perfil.talento_id}-${perfil.semana_numero}-${perfil.email ?? ""}`}
-                type="button"
-                onClick={() => setSelecionado(perfil)}
-                className="rounded-xl border border-card-elevated bg-surface-muted p-4 text-left transition-colors hover:border-primary/50 hover:bg-surface"
+              <article
+                key={cardKey}
+                className="relative rounded-xl border border-card-elevated bg-surface-muted p-4 transition-colors hover:border-primary/50 hover:bg-surface"
               >
-                <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelecionado(perfil)}
+                  className="absolute inset-0 z-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  aria-label={`Ver detalhes de ${nome}`}
+                />
+                <div className="pointer-events-none relative z-10 flex items-start gap-3">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
                     aria-hidden="true"
@@ -150,21 +155,18 @@ export function ListaTalentos({
                     <p className="mt-1 text-xs text-zinc-500">
                       Semana {perfil.semana_numero}
                     </p>
-                    <div
-                      className="mt-2"
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      <LinksTalento
-                        linkLinkedin={perfil.link_linkedin}
-                        linkProjeto={perfil.link_projeto}
-                        tamanho="sm"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                <dl className="mt-4 grid grid-cols-3 gap-2">
+                <div className="relative z-10 mt-2">
+                  <LinksTalento
+                    linkLinkedin={perfil.link_linkedin}
+                    linkProjeto={perfil.link_projeto}
+                    tamanho="sm"
+                  />
+                </div>
+
+                <dl className="pointer-events-none relative z-10 mt-4 grid grid-cols-3 gap-2">
                   <div className="rounded-lg bg-card px-2 py-2">
                     <dt className="text-[10px] uppercase tracking-wide text-zinc-500">
                       Técnica
@@ -191,10 +193,10 @@ export function ListaTalentos({
                   </div>
                 </dl>
 
-                <span className="mt-3 inline-flex text-xs font-medium text-primary">
+                <span className="pointer-events-none relative z-10 mt-3 inline-flex text-xs font-medium text-primary">
                   Ver detalhes →
                 </span>
-              </button>
+              </article>
             );
           })}
         </div>

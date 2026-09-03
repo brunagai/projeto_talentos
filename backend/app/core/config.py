@@ -1,4 +1,4 @@
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,11 +19,13 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 12
     SUPABASE_JWT_SECRET: str | None = None
     ENVIRONMENT: str = "development"
-    COOKIE_SECURE: bool = False
+    COOKIE_SECURE: bool | None = None
     AUTH_COOKIE_NAME: str = "access_token"
     MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
     LOGIN_RATE_LIMIT_ATTEMPTS: int = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    # Lista separada por vírgula. Ex.: http://localhost:3000,https://app.exemplo.com
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     @field_validator("SUPABASE_KEY", "SECRET_KEY", mode="before")
     @classmethod
@@ -48,6 +50,31 @@ class Settings(BaseSettings):
         if not stripped:
             raise ValueError("SUPABASE_URL não pode estar vazia")
         return stripped
+
+    @model_validator(mode="after")
+    def resolve_cookie_secure(self) -> "Settings":
+        if self.COOKIE_SECURE is None:
+            object.__setattr__(
+                self,
+                "COOKIE_SECURE",
+                self.ENVIRONMENT.lower() in ("production", "prod"),
+            )
+        return self
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        origins = [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip()]
+        return origins or ["http://localhost:3000"]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() in ("production", "prod")
+
+    @property
+    def cookie_secure_enabled(self) -> bool:
+        if self.COOKIE_SECURE is None:
+            return self.is_production
+        return bool(self.COOKIE_SECURE)
 
 
 settings = Settings()

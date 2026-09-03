@@ -19,10 +19,6 @@ export function podeFazerUpload(papel: PapelUsuario): boolean {
   return papel === "admin" || papel === "recrutador" || papel === "mentor";
 }
 
-export function podeVerMatchmaking(papel: PapelUsuario): boolean {
-  return papel === "admin" || papel === "recrutador";
-}
-
 export function podeVerGestor(papel: PapelUsuario): boolean {
   return (
     papel === "admin" ||

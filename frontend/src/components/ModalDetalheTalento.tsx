@@ -1,16 +1,38 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
-import ComparativoGestor from "./ComparativoGestor";
-import EvolucaoTemporal from "./EvolucaoTemporal";
 import LinksTalento from "./LinksTalento";
-import PainelPDI from "./PainelPDI";
 import SoftSkillsRadar from "./SoftSkillsRadar";
 import { useAuth } from "../context/AuthContext";
 import { podeVerGestor, type PapelUsuario } from "../lib/auth";
-import type { SkillScore } from "./HardSkillsBars";
+import type { SkillScore } from "./skillTypes";
 import type { PerfilTalentoData } from "./PerfilTalento";
+
+const EvolucaoTemporal = dynamic(() => import("./EvolucaoTemporal"), {
+  loading: () => (
+    <p className="text-sm text-zinc-400" aria-busy="true">
+      Carregando evolução temporal…
+    </p>
+  ),
+});
+
+const ComparativoGestor = dynamic(() => import("./ComparativoGestor"), {
+  loading: () => (
+    <p className="text-sm text-zinc-400" aria-busy="true">
+      Carregando comparativo…
+    </p>
+  ),
+});
+
+const PainelPDI = dynamic(() => import("./PainelPDI"), {
+  loading: () => (
+    <p className="text-sm text-zinc-400" aria-busy="true">
+      Carregando PDI…
+    </p>
+  ),
+});
 
 type AbaModal = "perfil" | "evolucao" | "gestor" | "pdi";
 

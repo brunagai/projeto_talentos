@@ -80,29 +80,6 @@ def decodificar_token(token: str) -> TokenPayload:
         ) from exc
 
 
-def verificar_token_supabase(token: str) -> TokenPayload | None:
-    """Valida JWT emitido pelo Supabase Auth (opcional)."""
-    secret = getattr(settings, "SUPABASE_JWT_SECRET", None)
-    if not secret:
-        return None
-    try:
-        dados = jwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-        return TokenPayload(
-            sub=str(dados["sub"]),
-            email=str(dados.get("email", "")),
-            papel=Papel.TALENTO,
-            organizacao_id="",
-            exp=int(dados["exp"]),
-        )
-    except jwt.PyJWTError:
-        return None
-
-
 async def obter_usuario_atual(
     credenciais: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     access_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,

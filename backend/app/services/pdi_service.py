@@ -11,6 +11,7 @@ from app.services.talentos_store import (
     TalentosStoreError,
     _obter_turma_id,
     _validar_uuid,
+    buscar_perfil_semana_talento,
     listar_historico_talento,
 )
 
@@ -124,21 +125,34 @@ def gerar_pdi(
     except (TalentosStoreError, MatchmakingError) as exc:
         raise PdiServiceError(str(exc)) from exc
 
-    historico = listar_historico_talento(talento_uuid, turma_id=turma_resolvida)
-    if historico is None:
+    semana_ref = semana_numero
+    if semana_ref is None:
+        historico = listar_historico_talento(talento_uuid, turma_id=turma_resolvida)
+        if historico is None:
+            raise PdiServiceError("Talento não encontrado.")
+        series = historico.get("series") or []
+        semana_ref = _ultima_semana(series)
+        if semana_ref is None:
+            raise PdiServiceError(
+                "Nenhuma avaliação semanal encontrada. Faça upload da planilha antes de gerar o PDI."
+            )
+        nome = historico.get("nome")
+        email = historico.get("email")
+    else:
+        nome = None
+        email = None
+
+    pacote = buscar_perfil_semana_talento(
+        talento_uuid,
+        semana_ref,
+        turma_id=turma_resolvida,
+    )
+    if pacote is None:
         raise PdiServiceError("Talento não encontrado.")
 
-    series = historico.get("series") or []
-    semana_ref = semana_numero or _ultima_semana(series)
-    if semana_ref is None:
-        raise PdiServiceError(
-            "Nenhuma avaliação semanal encontrada. Faça upload da planilha antes de gerar o PDI."
-        )
-
-    perfil_semana = next(
-        (item for item in series if item["semana_numero"] == semana_ref),
-        None,
-    )
+    nome = nome or pacote.get("nome")
+    email = email or pacote.get("email")
+    perfil_semana = pacote.get("perfil_semana")
     if perfil_semana is None:
         raise PdiServiceError(f"Não há autoavaliação para a semana {semana_ref}.")
 
@@ -163,8 +177,8 @@ def gerar_pdi(
         soft_auto,
         cargo,
         talento_id=talento_uuid,
-        nome=historico.get("nome"),
-        email=historico.get("email"),
+        nome=nome,
+        email=email,
     )
 
     gaps_por_competencia = {
@@ -172,7 +186,6 @@ def gerar_pdi(
     }
 
     metas: list[dict[str, Any]] = []
-    motivos_catalogo: list[str] = []
 
     for competencia in SKILL_KEYS:
         tipo = "hard" if competencia in HARD_SKILL_KEYS else "soft"
@@ -234,7 +247,6 @@ def gerar_pdi(
                 "acoes": _acoes_para_competencia(competencia, tipo),
             }
         )
-        motivos_catalogo.extend(motivos)
 
     metas.sort(
         key=lambda item: (
@@ -246,8 +258,8 @@ def gerar_pdi(
 
     return {
         "talento_id": talento_uuid,
-        "nome": historico.get("nome"),
-        "email": historico.get("email"),
+        "nome": nome,
+        "email": email,
         "semana_referencia": semana_ref,
         "cargo_alvo": cargo.cargo,
         "area": cargo.area,
