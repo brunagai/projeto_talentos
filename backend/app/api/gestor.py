@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.models.avaliacao_gestor import AvaliacaoGestorCreate
+from app.services.gestor_store import (
+    GestorStoreError,
+    buscar_avaliacao_gestor,
+    salvar_avaliacao_gestor,
+)
+
+router = APIRouter(prefix="/gestor", tags=["gestor"])
+
+
+class AvaliacaoGestorResponse(BaseModel):
+    id: str
+    talento_id: str
+    semana_numero: int
+    gestor_nome: str | None = None
+    hard_skills: dict[str, int] = Field(default_factory=dict)
+    soft_skills: dict[str, int] = Field(default_factory=dict)
+    media_tecnica: float | None = None
+    media_socioemocional: float | None = None
+    feedback_performance: str | None = None
+    alinhamento_cultural: str | None = None
+    pontos_desenvolvimento: str | None = None
+    pontos_fortes: str | None = None
+
+
+@router.post("/avaliacoes", response_model=AvaliacaoGestorResponse)
+def registrar_avaliacao_gestor(
+    payload: AvaliacaoGestorCreate,
+    turma_id: str | None = Query(
+        default=None,
+        description="ID da turma. Se omitido, usa a turma padrão.",
+    ),
+) -> AvaliacaoGestorResponse:
+    """Registra ou atualiza a avaliação formal do gestor para um talento/semana."""
+    try:
+        payload.validar_notas()
+        resultado = salvar_avaliacao_gestor(payload.model_dump(mode="json"), turma_id=turma_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except GestorStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return AvaliacaoGestorResponse(**resultado)
+
+
+@router.get("/avaliacoes/{talento_id}", response_model=AvaliacaoGestorResponse)
+def obter_avaliacao_gestor(
+    talento_id: str,
+    semana_numero: int = Query(..., ge=1),
+    turma_id: str | None = Query(default=None),
+) -> AvaliacaoGestorResponse:
+    """Busca a avaliação do gestor para um talento em uma semana específica."""
+    try:
+        resultado = buscar_avaliacao_gestor(
+            talento_id,
+            semana_numero,
+            turma_id=turma_id,
+        )
+    except GestorStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if resultado is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Avaliação do gestor não encontrada para esta semana.",
+        )
+
+    return AvaliacaoGestorResponse(**resultado)

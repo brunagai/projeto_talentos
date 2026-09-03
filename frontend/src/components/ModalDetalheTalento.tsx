@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+import ComparativoGestor from "./ComparativoGestor";
 import EvolucaoTemporal from "./EvolucaoTemporal";
 import LinksTalento from "./LinksTalento";
 import SoftSkillsRadar from "./SoftSkillsRadar";
 import type { SkillScore } from "./HardSkillsBars";
 import type { PerfilTalentoData } from "./PerfilTalento";
 
-type AbaModal = "perfil" | "evolucao";
+type AbaModal = "perfil" | "evolucao" | "gestor";
 
 interface ModalDetalheTalentoProps {
   perfil: PerfilTalentoData;
@@ -210,11 +211,29 @@ export function ModalDetalheTalento({
           >
             Evolução temporal
           </button>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("gestor")}
+            aria-pressed={abaAtiva === "gestor"}
+            className={[
+              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              abaAtiva === "gestor"
+                ? "border-primary text-primary"
+                : "border-transparent text-zinc-400 hover:text-zinc-200",
+            ].join(" ")}
+          >
+            Gestor & comparativo
+          </button>
         </nav>
 
         <div className="overflow-y-auto px-5 py-5">
           {abaAtiva === "evolucao" ? (
             <EvolucaoTemporal talentoId={perfil.talento_id} />
+          ) : abaAtiva === "gestor" ? (
+            <ComparativoGestor
+              talentoId={perfil.talento_id}
+              semanaNumero={perfil.semana_numero}
+            />
           ) : (
             <>
               <dl className="mb-6 grid gap-3 sm:grid-cols-3">
