@@ -167,7 +167,11 @@ def resolver_turma_id(
             if isinstance(exc, AuthStoreError):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=str(exc),
+                    detail=getattr(
+                        exc,
+                        "public_message",
+                        "Acesso negado à turma solicitada.",
+                    ),
                 ) from exc
             raise
         return turma_resolvida
@@ -192,7 +196,11 @@ def resolver_turma_id(
         if isinstance(exc, AuthStoreError):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=str(exc),
+                detail=getattr(
+                    exc,
+                    "public_message",
+                    "Acesso negado à turma solicitada.",
+                ),
             ) from exc
         raise
     return usuario.turma_id

@@ -4,6 +4,17 @@ import { NextResponse } from "next/server";
 
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "access_token";
 
+function cookieSecure(): boolean {
+  const raw = process.env.COOKIE_SECURE?.trim().toLowerCase();
+  if (raw === "true" || raw === "1") {
+    return true;
+  }
+  if (raw === "false" || raw === "0") {
+    return false;
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 function authSecret(): Uint8Array | null {
   const raw = process.env.AUTH_SECRET || process.env.JWT_SECRET;
   if (!raw || !raw.trim()) {
@@ -32,6 +43,8 @@ function limparCookieERedirecionarLogin(request: NextRequest): NextResponse {
     httpOnly: true,
     path: "/",
     maxAge: 0,
+    sameSite: "lax",
+    secure: cookieSecure(),
   });
   return response;
 }
@@ -47,9 +60,7 @@ export async function middleware(request: NextRequest) {
   const valido = token ? await tokenValido(token) : false;
 
   if (pathname.startsWith("/login")) {
-    if (valido) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+    // Sempre permite a tela de login (não redireciona por cookie antigo).
     return NextResponse.next();
   }
 

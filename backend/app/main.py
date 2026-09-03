@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Valida conexão com Supabase e garante org/turma padrão na inicialização."""
-    client = get_supabase()
-    client.table("turmas").select("id").limit(1).execute()
     try:
+        client = get_supabase()
+        client.table("turmas").select("id").limit(1).execute()
         organizacao_id = garantir_organizacao_padrao()
         garantir_turma_padrao(organizacao_id=organizacao_id)
     except Exception:
         logger.exception(
-            "Falha ao garantir organização/turma padrão no startup. "
+            "Falha ao validar Supabase ou garantir organização/turma no startup. "
             "A API sobe, mas dados iniciais podem estar incompletos."
         )
     yield

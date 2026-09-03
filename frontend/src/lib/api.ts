@@ -32,10 +32,27 @@ export async function apiFetch<T>(
   });
 
   if (response.status === 401) {
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    const body = (await response.json().catch(() => null)) as {
+      detail?: string;
+      message?: string;
+    } | null;
+    const mensagem =
+      body?.message ??
+      body?.detail ??
+      "Sessão expirada. Faça login novamente.";
+
+    const isAuthEndpoint =
+      path.startsWith("/auth/login") || path.startsWith("/auth/logout");
+
+    if (
+      !isAuthEndpoint &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login")
+    ) {
       window.location.href = "/login";
     }
-    throw new ApiError("Sessão expirada. Faça login novamente.", 401);
+
+    throw new ApiError(mensagem, 401);
   }
 
   if (!response.ok) {

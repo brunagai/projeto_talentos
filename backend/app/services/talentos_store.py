@@ -486,50 +486,65 @@ def listar_talentos(
 ) -> list[dict[str, Any]]:
     """Lista talentos da turma. Com semana, retorna perfis da avaliação correspondente.
 
-    Paginação opcional via page/page_size (1-based). Sem page_size, retorna todos.
+    Paginação opcional via page/page_size (1-based) aplicada no PostgREST (.range).
+    Sem page_size, retorna todos.
     """
     client = get_supabase()
     turma_resolvida = _obter_turma_id(turma_id)
+    faixa = _faixa_paginacao(page=page, page_size=page_size)
 
     if semana_numero is not None:
+        def _query_avaliacoes():
+            query = (
+                client.table("avaliacoes_semanais")
+                .select("*, talentos(email, nome)")
+                .eq("turma_id", turma_resolvida)
+                .eq("semana_numero", semana_numero)
+                .order("talento_id")
+            )
+            if faixa is not None:
+                query = query.range(faixa[0], faixa[1])
+            return query.execute()
+
         avaliacoes = _executar(
             "listar avaliações por turma e semana",
-            lambda: client.table("avaliacoes_semanais")
-            .select("*, talentos(email, nome)")
-            .eq("turma_id", turma_resolvida)
-            .eq("semana_numero", semana_numero)
-            .execute(),
+            _query_avaliacoes,
         )
         resultado: list[dict[str, Any]] = []
         for row in avaliacoes.data or []:
             talento_info = row.get("talentos") or {}
             perfil = _avaliacao_para_resposta(row, talento_info)
             resultado.append(perfil)
-        return _aplicar_paginacao(resultado, page=page, page_size=page_size)
+        return resultado
 
-    talentos = _executar(
-        "listar talentos por turma",
-        lambda: client.table("talentos")
-        .select("*")
-        .eq("turma_id", turma_resolvida)
-        .execute(),
-    )
-    itens = [_talento_para_resposta(row) for row in talentos.data or []]
-    return _aplicar_paginacao(itens, page=page, page_size=page_size)
+    def _query_talentos():
+        query = (
+            client.table("talentos")
+            .select("*")
+            .eq("turma_id", turma_resolvida)
+            .order("nome")
+        )
+        if faixa is not None:
+            query = query.range(faixa[0], faixa[1])
+        return query.execute()
+
+    talentos = _executar("listar talentos por turma", _query_talentos)
+    return [_talento_para_resposta(row) for row in talentos.data or []]
 
 
-def _aplicar_paginacao(
-    itens: list[dict[str, Any]],
+def _faixa_paginacao(
     *,
     page: int,
     page_size: int | None,
-) -> list[dict[str, Any]]:
+) -> tuple[int, int] | None:
+    """Retorna (from, to) inclusivo para PostgREST .range(), ou None sem paginação."""
     if page_size is None:
-        return itens
+        return None
     pagina = max(1, page)
     tamanho = max(1, min(page_size, 100))
     inicio = (pagina - 1) * tamanho
-    return itens[inicio : inicio + tamanho]
+    fim = inicio + tamanho - 1
+    return inicio, fim
 
 
 def buscar_perfil_semana_talento(

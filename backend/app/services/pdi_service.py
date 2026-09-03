@@ -22,6 +22,29 @@ NOTA_META_PADRAO = 4.0
 class PdiServiceError(RuntimeError):
     """Erro ao gerar PDI."""
 
+    status_code: int = 400
+    code: str = "pdi_error"
+    public_message: str = "Não foi possível gerar o PDI."
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        public_message: str | None = None,
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        if public_message is not None:
+            self.public_message = public_message
+        if status_code is not None:
+            self.status_code = status_code
+
+
+class PdiNotFoundError(PdiServiceError):
+    status_code = 404
+    code = "not_found"
+    public_message = "Talento não encontrado."
+
 
 ACOES_POR_COMPETENCIA: dict[str, list[dict[str, str]]] = {
     "Python": [
@@ -123,18 +146,29 @@ def gerar_pdi(
         talento_uuid = _validar_uuid(talento_id, "talento_id")
         cargo = resolver_cargo(cargo_alvo)
     except (TalentosStoreError, MatchmakingError) as exc:
-        raise PdiServiceError(str(exc)) from exc
+        raise PdiServiceError(
+            str(exc),
+            public_message=getattr(exc, "public_message", "Não foi possível gerar o PDI."),
+            status_code=getattr(exc, "status_code", 400),
+        ) from exc
 
     semana_ref = semana_numero
     if semana_ref is None:
         historico = listar_historico_talento(talento_uuid, turma_id=turma_resolvida)
         if historico is None:
-            raise PdiServiceError("Talento não encontrado.")
+            raise PdiNotFoundError(
+                "Talento não encontrado.",
+                public_message="Talento não encontrado.",
+            )
         series = historico.get("series") or []
         semana_ref = _ultima_semana(series)
         if semana_ref is None:
             raise PdiServiceError(
-                "Nenhuma avaliação semanal encontrada. Faça upload da planilha antes de gerar o PDI."
+                "Nenhuma avaliação semanal encontrada. Faça upload da planilha antes de gerar o PDI.",
+                public_message=(
+                    "Nenhuma avaliação semanal encontrada. "
+                    "Faça upload da planilha antes de gerar o PDI."
+                ),
             )
         nome = historico.get("nome")
         email = historico.get("email")
@@ -148,13 +182,19 @@ def gerar_pdi(
         turma_id=turma_resolvida,
     )
     if pacote is None:
-        raise PdiServiceError("Talento não encontrado.")
+        raise PdiNotFoundError(
+            "Talento não encontrado.",
+            public_message="Talento não encontrado.",
+        )
 
     nome = nome or pacote.get("nome")
     email = email or pacote.get("email")
     perfil_semana = pacote.get("perfil_semana")
     if perfil_semana is None:
-        raise PdiServiceError(f"Não há autoavaliação para a semana {semana_ref}.")
+        raise PdiServiceError(
+            f"Não há autoavaliação para a semana {semana_ref}.",
+            public_message=f"Não há autoavaliação para a semana {semana_ref}.",
+        )
 
     hard_auto = perfil_semana.get("hard_skills") or {}
     soft_auto = perfil_semana.get("soft_skills") or {}

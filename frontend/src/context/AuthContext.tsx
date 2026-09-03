@@ -39,8 +39,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void atualizarPerfil().finally(() => setCarregando(false));
-  }, [atualizarPerfil]);
+    // Sempre inicia na tela de login: encerra cookie/sessão anterior ao montar.
+    async function iniciarSemSessao() {
+      try {
+        await apiFetch("/auth/logout", { method: "POST" });
+      } catch {
+        // Ignora falha de rede; o estado local já fica deslogado.
+      } finally {
+        setUsuario(null);
+        setCarregando(false);
+      }
+    }
+    void iniciarSemSessao();
+  }, []);
 
   const login = useCallback(async (email: string, senha: string) => {
     const resposta = await apiFetch<LoginResponse>("/auth/login", {

@@ -13,6 +13,16 @@ from app.services.talentos_store import TalentosStoreError, listar_historico_tal
 router = APIRouter(prefix="/talentos", tags=["talentos"])
 
 
+def _http_de_servico(exc: Exception, default_status: int = 503) -> HTTPException:
+    return HTTPException(
+        status_code=int(getattr(exc, "status_code", default_status)),
+        detail=str(
+            getattr(exc, "public_message", None)
+            or "Erro ao processar a solicitação."
+        ),
+    )
+
+
 class SemanaHistoricoResponse(BaseModel):
     semana_numero: int
     horas_dedicadas: float = 0
@@ -54,7 +64,7 @@ def obter_historico_talento(
         turma_id = resolver_turma_id(usuario)
         historico = listar_historico_talento(talento_id, turma_id=turma_id)
     except TalentosStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise _http_de_servico(exc) from exc
 
     if historico is None:
         raise HTTPException(status_code=404, detail="Talento não encontrado.")
@@ -160,8 +170,7 @@ def comparativo_gestor(
             turma_id=turma_id,
         )
     except GestorStoreError as exc:
-        status = 404 if "não encontrado" in str(exc).lower() else 503
-        raise HTTPException(status_code=status, detail=str(exc)) from exc
+        raise _http_de_servico(exc) from exc
 
     gestor = comparativo.get("avaliacao_gestor")
     return ComparativoGestorResponse(
@@ -249,8 +258,7 @@ def obter_pdi_talento(
             turma_id=turma_id,
         )
     except PdiServiceError as exc:
-        status = 404 if "não encontrad" in str(exc).lower() else 400
-        raise HTTPException(status_code=status, detail=str(exc)) from exc
+        raise _http_de_servico(exc, default_status=400) from exc
 
     return PdiTalentoResponse(
         talento_id=pdi["talento_id"],

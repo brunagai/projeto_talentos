@@ -126,10 +126,18 @@ def salvar_avaliacao_gestor(
             .execute(),
         )
     except TalentosStoreError as exc:
-        raise GestorStoreError(str(exc)) from exc
+        raise GestorStoreError(
+            str(exc),
+            public_message=getattr(
+                exc, "public_message", "Erro ao acessar o banco de dados."
+            ),
+        ) from exc
 
     if not salvo.data:
-        raise GestorStoreError("Falha ao salvar avaliação do gestor.")
+        raise GestorStoreError(
+            "Falha ao salvar avaliação do gestor.",
+            public_message="Falha ao salvar avaliação do gestor.",
+        )
     return _gestor_para_resposta(salvo.data[0])
 
 
@@ -155,7 +163,12 @@ def buscar_avaliacao_gestor(
             .execute(),
         )
     except TalentosStoreError as exc:
-        raise GestorStoreError(str(exc)) from exc
+        raise GestorStoreError(
+            str(exc),
+            public_message=getattr(
+                exc, "public_message", "Erro ao acessar o banco de dados."
+            ),
+        ) from exc
 
     if not resultado.data:
         return None

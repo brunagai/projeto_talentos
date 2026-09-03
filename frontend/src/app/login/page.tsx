@@ -22,9 +22,11 @@ export default function LoginPage() {
           <LoginForm />
         </Card>
 
-        <p className="mt-6 text-center text-xs text-zinc-500">
-          Demo: admin@cobra-coral.com / admin123
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="mt-6 text-center text-xs text-zinc-500">
+            Demo: admin@cobra-coral.com / admin123
+          </p>
+        )}
       </div>
     </main>
   );
