@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 import bcrypt
 from postgrest.exceptions import APIError
@@ -176,6 +177,7 @@ def garantir_usuarios_demo(turma_id: str, organizacao_id: str) -> None:
             continue
 
         payload: dict[str, Any] = {
+            "id": str(uuid4()),
             "email": demo["email"],
             "senha_hash": _hash_senha(demo["senha"]),
             "nome": demo["nome"],

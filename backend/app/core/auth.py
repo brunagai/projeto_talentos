@@ -234,3 +234,18 @@ def verificar_acesso_talento(usuario: UsuarioAutenticado, talento_id: str) -> No
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Acesso permitido apenas aos seus próprios dados.",
             )
+
+
+def garantir_talento_na_turma(
+    usuario: UsuarioAutenticado,
+    talento_id: str,
+    *,
+    turma_id: str | None = None,
+) -> str:
+    """Valida acesso ao talento e garante que ele pertence à turma do contexto."""
+    from app.services.talentos_store import validar_talento_na_turma
+
+    verificar_acesso_talento(usuario, talento_id)
+    turma_resolvida = turma_id or resolver_turma_id(usuario)
+    validar_talento_na_turma(talento_id, turma_resolvida)
+    return turma_resolvida

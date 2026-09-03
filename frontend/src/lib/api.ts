@@ -41,8 +41,12 @@ export async function apiFetch<T>(
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
       detail?: string;
+      message?: string;
     } | null;
-    throw new ApiError(body?.detail ?? "Falha na requisição.", response.status);
+    throw new ApiError(
+      body?.message ?? body?.detail ?? `Falha na requisição (${response.status}).`,
+      response.status,
+    );
   }
 
   if (response.status === 204) {

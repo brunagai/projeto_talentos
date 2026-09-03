@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get("access_token")?.value;
 
   if (pathname.startsWith("/login")) {

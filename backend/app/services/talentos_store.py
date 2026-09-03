@@ -5,14 +5,17 @@ Substitui o cache em memória por persistência relacional no Supabase.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
-from uuid import UUID
+from uuid import NAMESPACE_DNS, UUID, uuid5
 
 from postgrest.exceptions import APIError
 
 from app.core.database import DatabaseError, get_supabase
+from app.exceptions.business import TalentoNotFoundError, TalentoTurmaMismatchError
 
 DEFAULT_TURMA_NOME = "Turma Padrão"
+logger = logging.getLogger(__name__)
 
 
 class TalentosStoreError(RuntimeError):
@@ -93,6 +96,57 @@ def _talento_para_resposta(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def validar_talento_na_turma(talento_id: str, turma_id: str) -> None:
+    """Garante que o talento existe e pertence à turma informada."""
+    client = get_supabase()
+    talento_uuid = _validar_uuid(talento_id, "talento_id")
+    turma_uuid = _validar_uuid(turma_id, "turma_id")
+
+    resultado = _executar(
+        "validar talento na turma",
+        lambda: client.table("talentos")
+        .select("id")
+        .eq("id", talento_uuid)
+        .eq("turma_id", turma_uuid)
+        .limit(1)
+        .execute(),
+    )
+    if not resultado.data:
+        raise TalentoNotFoundError(
+            "Talento não encontrado nesta turma.",
+            details={"talento_id": talento_uuid, "turma_id": turma_uuid},
+        )
+
+
+def validar_talentos_pertencem_turma(talento_ids: list[str], turma_id: str) -> None:
+    """Impede reatribuição de talentos existentes para outra turma."""
+    if not talento_ids:
+        return
+
+    client = get_supabase()
+    turma_uuid = _validar_uuid(turma_id, "turma_id")
+    ids_unicos = [_validar_uuid(talento_id, "talento_id") for talento_id in set(talento_ids)]
+
+    existentes = _executar(
+        "buscar talentos existentes para validação de turma",
+        lambda: client.table("talentos")
+        .select("id, turma_id")
+        .in_("id", ids_unicos)
+        .execute(),
+    )
+
+    for registro in existentes.data or []:
+        if str(registro["turma_id"]) != turma_uuid:
+            raise TalentoTurmaMismatchError(
+                "Talento pertence a outra turma e não pode ser salvo neste contexto.",
+                details={
+                    "talento_id": str(registro["id"]),
+                    "turma_id": turma_uuid,
+                    "turma_id_atual": str(registro["turma_id"]),
+                },
+            )
+
+
 def _avaliacao_para_resposta(row: dict[str, Any], talento: dict[str, Any]) -> dict[str, Any]:
     return {
         "talento_id": str(row["talento_id"]),
@@ -115,6 +169,194 @@ def _avaliacao_para_resposta(row: dict[str, Any], talento: dict[str, Any]) -> di
     }
 
 
+def _normalizar_email(email: Any) -> str | None:
+    if email is None:
+        return None
+    texto = str(email).strip().lower()
+    return texto or None
+
+
+def _buscar_ids_por_emails(turma_id: str, emails: list[str]) -> dict[str, str]:
+    unicos = sorted({email for email in emails if email})
+    if not unicos:
+        return {}
+
+    client = get_supabase()
+    encontrados: dict[str, str] = {}
+    for inicio in range(0, len(unicos), 100):
+        lote = unicos[inicio : inicio + 100]
+        resultado = _executar(
+            "buscar talentos por e-mail",
+            lambda lote=lote: client.table("talentos")
+            .select("id, email")
+            .eq("turma_id", turma_id)
+            .in_("email", lote)
+            .execute(),
+        )
+        for row in resultado.data or []:
+            email = _normalizar_email(row.get("email"))
+            if email:
+                encontrados[email] = str(row["id"])
+    return encontrados
+
+
+def _deduplicar_registros_talentos(
+    registros: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Um registro por e-mail (unique turma+email) e por id. Devolve aliases de IDs."""
+    por_email: dict[str, dict[str, Any]] = {}
+    sem_email: list[dict[str, Any]] = []
+
+    for registro in registros:
+        talento_id = str(registro["id"]).lower()
+        email = _normalizar_email(registro.get("email"))
+        atualizado = {**registro, "id": talento_id, "email": email}
+        if email:
+            por_email[email] = atualizado
+        else:
+            sem_email.append(atualizado)
+
+    por_id: dict[str, dict[str, Any]] = {}
+    for registro in list(por_email.values()) + sem_email:
+        por_id[str(registro["id"]).lower()] = registro
+
+    aliases: dict[str, str] = {}
+    for registro in registros:
+        original = str(registro["id"]).lower()
+        email = _normalizar_email(registro.get("email"))
+        if email and email in por_email:
+            aliases[original] = str(por_email[email]["id"]).lower()
+        else:
+            aliases[original] = original
+
+    for email, registro in por_email.items():
+        canonico = str(registro["id"]).lower()
+        aliases[canonico] = canonico
+        aliases[str(uuid5(NAMESPACE_DNS, email)).lower()] = canonico
+
+    return list(por_id.values()), aliases
+
+
+def _deduplicar_registros_avaliacoes(
+    registros: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    por_chave: dict[tuple[str, int], dict[str, Any]] = {}
+    for registro in registros:
+        chave = (str(registro["talento_id"]).lower(), int(registro["semana_numero"]))
+        por_chave[chave] = registro
+    return list(por_chave.values())
+
+
+def _resolver_ids_talentos_existentes(
+    turma_id: str,
+    registros: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Alinha IDs da planilha com talentos já persistidos pelo mesmo e-mail."""
+    emails = [
+        email
+        for email in (_normalizar_email(registro.get("email")) for registro in registros)
+        if email
+    ]
+    existentes = _buscar_ids_por_emails(turma_id, emails)
+
+    alinhados: list[dict[str, Any]] = []
+    for registro in registros:
+        atualizado = dict(registro)
+        email = _normalizar_email(registro.get("email"))
+        if email:
+            atualizado["email"] = email
+            if email in existentes:
+                atualizado["id"] = existentes[email]
+        alinhados.append(atualizado)
+
+    return _deduplicar_registros_talentos(alinhados)
+
+
+def _sincronizar_talento_id_avaliacoes(
+    registros_avaliacoes: list[dict[str, Any]],
+    mapa_ids: dict[str, str],
+) -> list[dict[str, Any]]:
+    sincronizados: list[dict[str, Any]] = []
+    for registro in registros_avaliacoes:
+        atualizado = dict(registro)
+        email = _normalizar_email(atualizado.pop("_email_ref", None))
+        if email:
+            email_id = str(uuid5(NAMESPACE_DNS, email)).lower()
+            if email_id in mapa_ids:
+                atualizado["talento_id"] = mapa_ids[email_id]
+        else:
+            talento_id = str(atualizado["talento_id"]).lower()
+            if talento_id in mapa_ids:
+                atualizado["talento_id"] = mapa_ids[talento_id]
+        sincronizados.append(atualizado)
+    return sincronizados
+
+
+def _validar_registros_sem_duplicatas(
+    registros_talentos: list[dict[str, Any]],
+    registros_avaliacoes: list[dict[str, Any]],
+) -> None:
+    """Garante que não restaram chaves duplicadas antes do upsert."""
+    ids_vistos: set[str] = set()
+    emails_vistos: dict[str, str] = {}
+
+    for registro in registros_talentos:
+        talento_id = str(registro["id"]).lower()
+        if talento_id in ids_vistos:
+            raise TalentosStoreError(
+                "Planilha contém IDs duplicados para o mesmo talento após normalização."
+            )
+        ids_vistos.add(talento_id)
+
+        email = _normalizar_email(registro.get("email"))
+        if not email:
+            continue
+        if email in emails_vistos and emails_vistos[email] != talento_id:
+            raise TalentosStoreError(
+                "Planilha contém o mesmo e-mail associado a talentos diferentes "
+                f"({emails_vistos[email]} e {talento_id}). "
+                "Corrija as linhas duplicadas e tente novamente."
+            )
+        emails_vistos[email] = talento_id
+
+    avaliacoes_vistas: set[tuple[str, int]] = set()
+    for registro in registros_avaliacoes:
+        chave = (str(registro["talento_id"]).lower(), int(registro["semana_numero"]))
+        if chave in avaliacoes_vistas:
+            raise TalentosStoreError(
+                "Planilha contém avaliações duplicadas para o mesmo talento e semana. "
+                "Remova as linhas repetidas e tente novamente."
+            )
+        avaliacoes_vistas.add(chave)
+
+
+def _upsert_lote(
+    tabela: str,
+    registros: list[dict[str, Any]],
+    on_conflict: str,
+    operacao: str,
+    tamanho: int = 80,
+) -> None:
+    if not registros:
+        return
+    client = get_supabase()
+    for inicio in range(0, len(registros), tamanho):
+        lote = registros[inicio : inicio + tamanho]
+        _executar(
+            operacao,
+            lambda lote=lote: client.table(tabela)
+            .upsert(lote, on_conflict=on_conflict)
+            .execute(),
+        )
+
+
+def _resolver_talento_id_item(item: dict[str, Any]) -> str:
+    email = _normalizar_email(item.get("email"))
+    if email:
+        return str(uuid5(NAMESPACE_DNS, email))
+    return _validar_uuid(str(item["talento_id"]), "talento_id")
+
+
 def salvar_talentos(
     talentos: list[dict[str, Any]],
     turma_id: str | None = None,
@@ -124,14 +366,13 @@ def salvar_talentos(
     if not talentos:
         return
 
-    client = get_supabase()
     turma_resolvida = _obter_turma_id(turma_id)
 
     registros_talentos: list[dict[str, Any]] = []
     registros_avaliacoes: list[dict[str, Any]] = []
 
     for item in talentos:
-        talento_id = _validar_uuid(str(item["talento_id"]), "talento_id")
+        talento_id = _resolver_talento_id_item(item)
         hard_skills = item.get("hard_skills") or {}
         soft_skills = item.get("soft_skills") or {}
 
@@ -139,7 +380,7 @@ def salvar_talentos(
             {
                 "id": talento_id,
                 "turma_id": turma_resolvida,
-                "email": item.get("email"),
+                "email": _normalizar_email(item.get("email")),
                 "nome": item.get("nome"),
                 "hard_skills": hard_skills,
                 "soft_skills": soft_skills,
@@ -154,6 +395,7 @@ def salvar_talentos(
             "turma_id": turma_resolvida,
             "talento_id": talento_id,
             "semana_numero": int(semana),
+            "_email_ref": _normalizar_email(item.get("email")),
             "horas_dedicadas": float(item.get("horas_dedicadas") or 0),
             "hard_skills": hard_skills,
             "soft_skills": soft_skills,
@@ -180,20 +422,35 @@ def salvar_talentos(
 
         registros_avaliacoes.append(registro_avaliacao)
 
-    _executar(
-        "salvar talentos em lote",
-        lambda: client.table("talentos")
-        .upsert(registros_talentos, on_conflict="id")
-        .execute(),
+    registros_talentos, mapa_ids = _resolver_ids_talentos_existentes(
+        turma_resolvida,
+        registros_talentos,
+    )
+    registros_avaliacoes = _sincronizar_talento_id_avaliacoes(
+        registros_avaliacoes,
+        mapa_ids,
+    )
+    registros_avaliacoes = _deduplicar_registros_avaliacoes(registros_avaliacoes)
+
+    _validar_registros_sem_duplicatas(registros_talentos, registros_avaliacoes)
+
+    talento_ids = [str(registro["id"]) for registro in registros_talentos]
+
+    validar_talentos_pertencem_turma(talento_ids, turma_resolvida)
+
+    logger.info(
+        "salvar_talentos: upsert em lote de %s talentos e %s avaliações",
+        len(registros_talentos),
+        len(registros_avaliacoes),
     )
 
-    if registros_avaliacoes:
-        _executar(
-            "salvar avaliações semanais em lote",
-            lambda: client.table("avaliacoes_semanais")
-            .upsert(registros_avaliacoes, on_conflict="talento_id,semana_numero")
-            .execute(),
-        )
+    _upsert_lote("talentos", registros_talentos, "id", "salvar talentos")
+    _upsert_lote(
+        "avaliacoes_semanais",
+        registros_avaliacoes,
+        "talento_id,semana_numero",
+        "salvar avaliações semanais",
+    )
 
 
 def listar_talentos(

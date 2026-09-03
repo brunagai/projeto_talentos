@@ -303,6 +303,15 @@ def _extract_skill_scores(
 
 
 def _resolve_talento_id(row: pd.Series, column_map: dict[str, str]) -> UUID | None:
+    """Resolve ID estável: e-mail sempre gera o mesmo UUID (evita duplicatas na planilha)."""
+    email_column = column_map.get("email")
+    if email_column is not None:
+        email = row.get(email_column)
+        if email is not None and not (isinstance(email, float) and pd.isna(email)):
+            email_text = str(email).strip().lower()
+            if email_text:
+                return uuid5(NAMESPACE_DNS, email_text)
+
     talento_column = column_map.get("talento_id")
     if talento_column is not None:
         raw_value = row.get(talento_column)
@@ -314,19 +323,7 @@ def _resolve_talento_id(row: pd.Series, column_map: dict[str, str]) -> UUID | No
             except ValueError:
                 return None
 
-    email_column = column_map.get("email")
-    if email_column is None:
-        return None
-
-    email = row.get(email_column)
-    if email is None or (isinstance(email, float) and pd.isna(email)):
-        return None
-
-    email_text = str(email).strip().lower()
-    if not email_text:
-        return None
-
-    return uuid5(NAMESPACE_DNS, email_text)
+    return None
 
 
 def _optional_text(row: pd.Series, column_map: dict[str, str], field: str) -> str | None:
@@ -431,6 +428,8 @@ def _row_to_avaliacao_e_perfil(
     avaliacao = AvaliacaoSemanalCreate.model_validate(payload)
 
     email = _optional_text(row, column_map, "email")
+    if email is not None:
+        email = email.strip().lower()
     nome_coluna = _resolve_column(row.index, ("nome", "name"))
     nome: str | None = None
     if nome_coluna is not None:
@@ -492,6 +491,7 @@ def processar_planilha(file_name: str, content: bytes) -> PlanilhaProcessamentoR
     avaliacoes: list[AvaliacaoSemanalCreate] = []
     perfis: list[PerfilTalentoSkills] = []
     erros: list[str] = []
+    chaves_vistas: dict[tuple[str, int], int] = {}
 
     for index, row in dataframe.iterrows():
         linha = int(index) + 2
@@ -499,6 +499,18 @@ def processar_planilha(file_name: str, content: bytes) -> PlanilhaProcessamentoR
             avaliacao, perfil = _row_to_avaliacao_e_perfil(
                 row, column_map, tech_columns, soft_columns
             )
+            email_norm = (perfil.email or "").strip().lower() or None
+            chave = (
+                email_norm or str(avaliacao.talento_id),
+                int(avaliacao.semana_numero),
+            )
+            if chave in chaves_vistas:
+                erros.append(
+                    f"Linha {linha}: duplicata da linha {chaves_vistas[chave]} "
+                    f"(mesmo talento/semana); a última linha prevalece."
+                )
+            chaves_vistas[chave] = linha
+
             avaliacoes.append(avaliacao)
             perfis.append(perfil)
         except (PlanilhaProcessingError, ValidationError) as exc:
@@ -507,6 +519,20 @@ def processar_planilha(file_name: str, content: bytes) -> PlanilhaProcessamentoR
     if not avaliacoes:
         detail = "; ".join(erros[:5]) if erros else "Nenhuma linha válida encontrada."
         raise PlanilhaProcessingError(detail)
+
+    avaliacoes_por_chave: dict[tuple[str, int], AvaliacaoSemanalCreate] = {}
+    perfis_por_chave: dict[tuple[str, int], PerfilTalentoSkills] = {}
+    for avaliacao, perfil in zip(avaliacoes, perfis, strict=True):
+        email_norm = (perfil.email or "").strip().lower() or None
+        chave = (
+            email_norm or str(avaliacao.talento_id),
+            int(avaliacao.semana_numero),
+        )
+        avaliacoes_por_chave[chave] = avaliacao
+        perfis_por_chave[chave] = perfil
+
+    avaliacoes = list(avaliacoes_por_chave.values())
+    perfis = list(perfis_por_chave.values())
 
     return PlanilhaProcessamentoResult(
         avaliacoes=avaliacoes,
