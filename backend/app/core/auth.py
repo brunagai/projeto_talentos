@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Annotated, Callable
@@ -12,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.core.database import bind_request_supabase, reset_request_supabase
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -47,6 +49,12 @@ class UsuarioAutenticado(BaseModel):
 
 
 def criar_token_acesso(usuario: dict[str, str | None]) -> str:
+    """Emite JWT da sessão.
+
+    Inclui `role`/`aud` = authenticated para o PostgREST aplicar RLS
+    quando `SUPABASE_ANON_KEY` está configurada. Em modo RLS, `SECRET_KEY`
+    deve ser o JWT Secret do projeto Supabase.
+    """
     expira = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": str(usuario["id"]),
@@ -55,6 +63,8 @@ def criar_token_acesso(usuario: dict[str, str | None]) -> str:
         "organizacao_id": str(usuario["organizacao_id"]),
         "turma_id": str(usuario["turma_id"]) if usuario.get("turma_id") else None,
         "talento_id": str(usuario["talento_id"]) if usuario.get("talento_id") else None,
+        "role": "authenticated",
+        "aud": "authenticated",
         "exp": expira,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=JWT_ALGORITHM)
@@ -83,7 +93,7 @@ def decodificar_token(token: str) -> TokenPayload:
 async def obter_usuario_atual(
     credenciais: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     access_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,
-) -> UsuarioAutenticado:
+) -> AsyncIterator[UsuarioAutenticado]:
     token: str | None = None
     if credenciais is not None and credenciais.credentials:
         token = credenciais.credentials
@@ -100,29 +110,33 @@ async def obter_usuario_atual(
     from app.services.auth_store import buscar_usuario_por_id
 
     payload = decodificar_token(token)
-    usuario = buscar_usuario_por_id(payload.sub)
-    if usuario is None or not usuario.get("ativo", True):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado ou inativo.",
-        )
+    ctx = bind_request_supabase(token)
+    try:
+        usuario = buscar_usuario_por_id(payload.sub)
+        if usuario is None or not usuario.get("ativo", True):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuário não encontrado ou inativo.",
+            )
 
-    if str(usuario["organizacao_id"]) != payload.organizacao_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Contexto de organização inválido.",
-        )
+        if str(usuario["organizacao_id"]) != payload.organizacao_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Contexto de organização inválido.",
+            )
 
-    return UsuarioAutenticado(
-        id=str(usuario["id"]),
-        email=str(usuario["email"]),
-        nome=str(usuario["nome"]),
-        papel=Papel(str(usuario["papel"])),
-        organizacao_id=str(usuario["organizacao_id"]),
-        organizacao_nome=usuario.get("organizacao_nome"),
-        turma_id=str(usuario["turma_id"]) if usuario.get("turma_id") else None,
-        talento_id=str(usuario["talento_id"]) if usuario.get("talento_id") else None,
-    )
+        yield UsuarioAutenticado(
+            id=str(usuario["id"]),
+            email=str(usuario["email"]),
+            nome=str(usuario["nome"]),
+            papel=Papel(str(usuario["papel"])),
+            organizacao_id=str(usuario["organizacao_id"]),
+            organizacao_nome=usuario.get("organizacao_nome"),
+            turma_id=str(usuario["turma_id"]) if usuario.get("turma_id") else None,
+            talento_id=str(usuario["talento_id"]) if usuario.get("talento_id") else None,
+        )
+    finally:
+        reset_request_supabase(ctx)
 
 
 class RoleChecker:

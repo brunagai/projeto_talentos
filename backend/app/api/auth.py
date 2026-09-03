@@ -66,6 +66,10 @@ def login(
 ) -> LoginResponse:
     """Autentica usuário e define cookie HttpOnly de sessão."""
     client_ip = request.client.host if request.client else "unknown"
+    if settings.TRUST_PROXY:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip() or client_ip
     verificar_rate_limit(
         f"login:{client_ip}",
         max_tentativas=settings.LOGIN_RATE_LIMIT_ATTEMPTS,

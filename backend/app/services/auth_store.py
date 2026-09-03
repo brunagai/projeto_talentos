@@ -8,7 +8,7 @@ from uuid import uuid4
 import bcrypt
 from postgrest.exceptions import APIError
 
-from app.core.database import get_supabase
+from app.core.database import get_supabase, get_supabase_admin
 
 ORGANIZACAO_PADRAO_SLUG = "cobra-coral"
 ORGANIZACAO_PADRAO_NOME = "Cobra Coral Consultoria"
@@ -62,7 +62,7 @@ def verificar_senha(senha: str, senha_hash: str) -> bool:
 
 
 def garantir_organizacao_padrao() -> str:
-    client = get_supabase()
+    client = get_supabase_admin()
     existente = _executar(
         "buscar organização padrão",
         lambda: client.table("organizacoes")
@@ -138,7 +138,8 @@ def buscar_usuario_por_id(usuario_id: str) -> dict[str, Any] | None:
 
 
 def autenticar_usuario(email: str, senha: str) -> dict[str, Any] | None:
-    client = get_supabase()
+    # Login ainda não tem JWT: usa service_role só para verificar credenciais.
+    client = get_supabase_admin()
     resultado = _executar(
         "autenticar usuário",
         lambda: client.table("usuarios")
@@ -177,7 +178,7 @@ def garantir_usuarios_demo(
         )
 
     validar_turma_na_organizacao(turma_id, organizacao_id)
-    client = get_supabase()
+    client = get_supabase_admin()
 
     for demo in usuarios:
         existente = _executar(

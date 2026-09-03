@@ -7,6 +7,7 @@ import AbaCargos from "./AbaCargos";
 import Card from "./Card";
 import ListaTalentos from "./ListaTalentos";
 import { AlertErro } from "./AlertErro";
+import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import type { PerfilTalentoData } from "./PerfilTalento";
 import {
   LIMIAR_ADERENCIA,
@@ -16,6 +17,7 @@ import {
   type RankingCandidato,
 } from "./matchmakingUtils";
 import { useCargos } from "../hooks/useCargos";
+import { formatarNota } from "../lib/format";
 
 type AbaAtiva = "cargos" | "areas" | "talentos";
 
@@ -34,10 +36,6 @@ interface ResultadosPlanilhaProps {
   erros: string[];
   metricas: MetricasConsolidadas;
   perfis: PerfilTalentoData[];
-}
-
-function formatarNota(valor: number): string {
-  return valor.toFixed(2);
 }
 
 function montarRankings(
@@ -188,71 +186,70 @@ export function ResultadosPlanilha({
         )}
       </Card>
 
-      <nav
-        aria-label="Navegação de resultados"
-        className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
+      <Tabs
+        value={abaAtiva}
+        onValueChange={(v) => setAbaAtiva(v as AbaAtiva)}
       >
-        {abas.map((aba) => (
-          <button
-            key={aba.id}
-            type="button"
-            onClick={() => setAbaAtiva(aba.id)}
-            className={[
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
-              abaAtiva === aba.id
-                ? "bg-primary text-white shadow-sm shadow-primary/30"
-                : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
-            ].join(" ")}
-            aria-pressed={abaAtiva === aba.id}
-          >
-            {aba.label}
-          </button>
-        ))}
-      </nav>
+        <TabList
+          aria-label="Navegação de resultados"
+          className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
+        >
+          {abas.map((aba) => (
+            <Tab
+              key={aba.id}
+              id={aba.id}
+              className={(ativo) =>
+                [
+                  "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
+                  ativo
+                    ? "bg-primary text-white shadow-sm shadow-primary/30"
+                    : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
+                ].join(" ")
+              }
+            >
+              {aba.label}
+            </Tab>
+          ))}
+        </TabList>
 
-      <section className="w-full">
-        {abaAtiva === "cargos" && (
-          <>
-            {carregandoCargos && (
-              <Card className="w-full">
-                <p className="text-sm text-zinc-400">
-                  Calculando ranking de fit por cargo…
-                </p>
-              </Card>
-            )}
-            {erroCargos && (
-              <Card className="w-full border-primary/40">
-                <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
-              </Card>
-            )}
-            {!carregandoCargos && !erroCargos && (
-              <AbaCargos rankings={rankings} />
-            )}
-          </>
-        )}
+        <TabPanel id="cargos" className="mt-6 w-full">
+          {carregandoCargos && (
+            <Card className="w-full">
+              <p className="text-sm text-zinc-400">
+                Calculando ranking de fit por cargo…
+              </p>
+            </Card>
+          )}
+          {erroCargos && (
+            <Card className="w-full border-primary/40">
+              <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
+            </Card>
+          )}
+          {!carregandoCargos && !erroCargos && (
+            <AbaCargos rankings={rankings} />
+          )}
+        </TabPanel>
 
-        {abaAtiva === "areas" && (
-          <>
-            {carregandoCargos && (
-              <Card className="w-full">
-                <p className="text-sm text-zinc-400">Carregando áreas…</p>
-              </Card>
-            )}
-            {!carregandoCargos && !erroCargos && (
-              <AbaAreas rankings={rankings} />
-            )}
-            {erroCargos && (
-              <Card className="w-full border-primary/40">
-                <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
-              </Card>
-            )}
-          </>
-        )}
+        <TabPanel id="areas" className="mt-6 w-full">
+          {carregandoCargos && (
+            <Card className="w-full">
+              <p className="text-sm text-zinc-400">Carregando áreas…</p>
+            </Card>
+          )}
+          {!carregandoCargos && !erroCargos && (
+            <AbaAreas rankings={rankings} />
+          )}
+          {erroCargos && (
+            <Card className="w-full border-primary/40">
+              <AlertErro className="text-sm text-primary">{erroCargos}</AlertErro>
+            </Card>
+          )}
+        </TabPanel>
 
-        {abaAtiva === "talentos" && (
+        <TabPanel id="talentos" className="mt-6 w-full">
           <ListaTalentos perfis={perfis} itensPorPagina={12} />
-        )}
-      </section>
+        </TabPanel>
+      </Tabs>
     </div>
   );
 }

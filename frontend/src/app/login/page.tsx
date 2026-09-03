@@ -24,7 +24,7 @@ export default function LoginPage() {
 
         {process.env.NODE_ENV === "development" && (
           <p className="mt-6 text-center text-xs text-zinc-500">
-            Demo: admin@cobra-coral.com / admin123
+            Dev: admin@cobra-coral.com (senha via seed / DEMO_PASSWORD_ADMIN)
           </p>
         )}
       </div>

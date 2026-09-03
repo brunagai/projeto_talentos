@@ -206,8 +206,19 @@ def gerar_pdi(
             semana_ref,
             turma_id=turma_resolvida,
         )
-    except GestorStoreError:
-        avaliacao_gestor = None
+    except GestorStoreError as exc:
+        if getattr(exc, "status_code", 503) == 404:
+            avaliacao_gestor = None
+        else:
+            raise PdiServiceError(
+                str(exc),
+                public_message=getattr(
+                    exc,
+                    "public_message",
+                    "Erro ao buscar avaliação do gestor.",
+                ),
+                status_code=int(getattr(exc, "status_code", 503)),
+            ) from exc
 
     hard_gestor = (avaliacao_gestor or {}).get("hard_skills") or {}
     soft_gestor = (avaliacao_gestor or {}).get("soft_skills") or {}

@@ -8,7 +8,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.core.database import get_supabase
+from app.core.database import get_supabase_admin
 
 router = APIRouter(tags=["health"])
 
@@ -39,7 +39,7 @@ def liveness() -> dict[str, str]:
 def readiness() -> HealthResponse | JSONResponse:
     """Verifica conectividade rápida com o Supabase antes de receber tráfego."""
     try:
-        client = get_supabase()
+        client = get_supabase_admin()
         client.table("turmas").select("id").limit(1).execute()
     except Exception:
         return JSONResponse(

@@ -6,14 +6,11 @@ import Card from "./Card";
 import LinksTalento from "./LinksTalento";
 import ModalDetalheTalento from "./ModalDetalheTalento";
 import type { PerfilTalentoData } from "./PerfilTalento";
+import { formatarNota } from "../lib/format";
 
 interface ListaTalentosProps {
   perfis: PerfilTalentoData[];
   itensPorPagina?: number;
-}
-
-function formatarNota(valor: number): string {
-  return valor.toFixed(2);
 }
 
 function iniciais(perfil: PerfilTalentoData): string {

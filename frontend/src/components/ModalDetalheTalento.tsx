@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import LinksTalento from "./LinksTalento";
 import SoftSkillsRadar from "./SoftSkillsRadar";
+import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import type { SkillScore } from "./skillTypes";
 import type { PerfilTalentoData } from "./PerfilTalento";
 
@@ -243,79 +244,56 @@ export function ModalDetalheTalento({
           </div>
         )}
 
-        <nav
-          aria-label="Seções do perfil"
-          className="flex border-b border-card-elevated bg-card px-5"
+        <Tabs
+          value={abaAtiva}
+          onValueChange={(v) => setAbaAtiva(v as AbaModal)}
         >
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("perfil")}
-            aria-pressed={abaAtiva === "perfil"}
-            className={[
-              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-              abaAtiva === "perfil"
-                ? "border-primary text-primary"
-                : "border-transparent text-zinc-400 hover:text-zinc-200",
-            ].join(" ")}
+          <TabList
+            aria-label="Seções do perfil"
+            className="flex border-b border-card-elevated bg-card px-5"
           >
-            Perfil atual
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("evolucao")}
-            aria-pressed={abaAtiva === "evolucao"}
-            className={[
-              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-              abaAtiva === "evolucao"
-                ? "border-primary text-primary"
-                : "border-transparent text-zinc-400 hover:text-zinc-200",
-            ].join(" ")}
-          >
-            Evolução temporal
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("gestor")}
-            aria-pressed={abaAtiva === "gestor"}
-            className={[
-              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-              abaAtiva === "gestor"
-                ? "border-primary text-primary"
-                : "border-transparent text-zinc-400 hover:text-zinc-200",
-            ].join(" ")}
-          >
-            Gestor & comparativo
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("pdi")}
-            aria-pressed={abaAtiva === "pdi"}
-            className={[
-              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-              abaAtiva === "pdi"
-                ? "border-primary text-primary"
-                : "border-transparent text-zinc-400 hover:text-zinc-200",
-            ].join(" ")}
-          >
-            PDI
-          </button>
-        </nav>
+            {(
+              [
+                ["perfil", "Perfil atual"],
+                ["evolucao", "Evolução temporal"],
+                ["gestor", "Gestor & comparativo"],
+                ["pdi", "PDI"],
+              ] as const
+            ).map(([id, label]) => (
+              <Tab
+                key={id}
+                id={id}
+                className={(ativo) =>
+                  [
+                    "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                    ativo
+                      ? "border-primary text-primary"
+                      : "border-transparent text-zinc-400 hover:text-zinc-200",
+                  ].join(" ")
+                }
+              >
+                {label}
+              </Tab>
+            ))}
+          </TabList>
 
-        <div className="overflow-y-auto px-5 py-5">
-          {abaAtiva === "evolucao" ? (
-            <EvolucaoTemporal talentoId={perfil.talento_id} />
-          ) : abaAtiva === "gestor" ? (
-            <ComparativoGestor
-              talentoId={perfil.talento_id}
-              semanaNumero={perfil.semana_numero}
-            />
-          ) : abaAtiva === "pdi" ? (
-            <PainelPDI
-              talentoId={perfil.talento_id}
-              semanaNumero={perfil.semana_numero}
-            />
-          ) : (
-            <>
+          <div className="overflow-y-auto px-5 py-5">
+            <TabPanel id="evolucao">
+              <EvolucaoTemporal talentoId={perfil.talento_id} />
+            </TabPanel>
+            <TabPanel id="gestor">
+              <ComparativoGestor
+                talentoId={perfil.talento_id}
+                semanaNumero={perfil.semana_numero}
+              />
+            </TabPanel>
+            <TabPanel id="pdi">
+              <PainelPDI
+                talentoId={perfil.talento_id}
+                semanaNumero={perfil.semana_numero}
+              />
+            </TabPanel>
+            <TabPanel id="perfil">
               <dl className="mb-6 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-card-elevated bg-surface-muted p-3">
                   <dt className="text-xs uppercase tracking-wide text-zinc-500">
@@ -406,9 +384,9 @@ export function ModalDetalheTalento({
                   </p>
                 )}
               </section>
-            </>
-          )}
-        </div>
+            </TabPanel>
+          </div>
+        </Tabs>
       </div>
     </div>
   );

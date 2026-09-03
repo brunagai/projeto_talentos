@@ -1,3 +1,7 @@
+-- MANUAL / ONE-SHOT — NÃO aplicar em pipeline automático de migrations.
+-- Contém DROP TABLE IF EXISTS usuarios CASCADE.
+-- Caminho: backend/supabase/manual/ (fora de migrations/).
+--
 -- Reparo: recria tabela usuarios com schema esperado pela aplicação
 -- Execute no SQL Editor do Supabase se o login falhar com usuários demo.
 

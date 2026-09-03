@@ -12,18 +12,23 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    DATABASE_URL: str = ""
     SUPABASE_URL: AnyHttpUrl
+    # service_role — bypassa RLS. Usar só em admin/seed/login.
     SUPABASE_KEY: str = Field(min_length=1)
+    # anon key — request path com RLS (Fase F). Obrigatória em production.
+    SUPABASE_ANON_KEY: str | None = None
     SECRET_KEY: str = Field(min_length=1)
     JWT_EXPIRE_MINUTES: int = 60 * 12
-    SUPABASE_JWT_SECRET: str | None = None
     ENVIRONMENT: str = "development"
     COOKIE_SECURE: bool | None = None
     AUTH_COOKIE_NAME: str = "access_token"
     MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
     LOGIN_RATE_LIMIT_ATTEMPTS: int = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    # redis://... — rate limit compartilhado entre workers. Sem valor: memória.
+    REDIS_URL: str | None = None
+    # Confia em X-Forwarded-For apenas atrás de proxy conhecido.
+    TRUST_PROXY: bool = False
     # Lista separada por vírgula. Ex.: http://localhost:3000,https://app.exemplo.com
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
@@ -51,6 +56,16 @@ class Settings(BaseSettings):
             raise ValueError("SUPABASE_URL não pode estar vazia")
         return stripped
 
+    @field_validator("SUPABASE_ANON_KEY", "REDIS_URL", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            value = str(value)
+        stripped = value.strip()
+        return stripped or None
+
     @model_validator(mode="after")
     def resolve_cookie_secure(self) -> "Settings":
         if self.COOKIE_SECURE is None:
@@ -58,6 +73,15 @@ class Settings(BaseSettings):
                 self,
                 "COOKIE_SECURE",
                 self.ENVIRONMENT.lower() in ("production", "prod"),
+            )
+        return self
+
+    @model_validator(mode="after")
+    def require_anon_key_in_production(self) -> "Settings":
+        if self.is_production and not self.SUPABASE_ANON_KEY:
+            raise ValueError(
+                "SUPABASE_ANON_KEY é obrigatória em production "
+                "(request path com RLS — ver docs/TENANCY_E_SERVICE_ROLE.md)."
             )
         return self
 
@@ -75,6 +99,11 @@ class Settings(BaseSettings):
         if self.COOKIE_SECURE is None:
             return self.is_production
         return bool(self.COOKIE_SECURE)
+
+    @property
+    def rls_request_path_enabled(self) -> bool:
+        """Usa anon + JWT do usuário no PostgREST (RLS efetiva)."""
+        return bool(self.SUPABASE_ANON_KEY)
 
 
 settings = Settings()

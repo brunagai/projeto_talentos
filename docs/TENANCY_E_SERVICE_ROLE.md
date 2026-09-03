@@ -1,32 +1,32 @@
 # Tenancy e service_role
 
-## Situação atual
+## Situação atual (Fase F)
 
-O backend conecta ao Supabase com a chave **service_role**, que **bypassa Row Level Security (RLS)**.
+O backend separa dois clientes Supabase:
 
-As migrations em `backend/supabase/migrations/006_row_level_security.sql` definem políticas RLS, mas elas **não protegem** o request path da API enquanto o cliente Python usar service_role.
+| Cliente | Chave | Quando |
+|---------|-------|--------|
+| **Admin** (`get_supabase_admin`) | `SUPABASE_KEY` (service_role) | Login, seed, health, lifespan |
+| **Request** (`get_supabase` com JWT) | `SUPABASE_ANON_KEY` + JWT da sessão | Rotas autenticadas |
 
-O isolamento entre organizações e turmas é **aplicação-first**:
+Quando `SUPABASE_ANON_KEY` está definida, o JWT emitido no login inclui `role`/`aud` = `authenticated` e claims `organizacao_id`, `turma_id`, `papel`, `talento_id`. O PostgREST aplica as políticas de `006_row_level_security.sql` (+ `008_rls_talento_self_write.sql`).
+
+**Em `ENVIRONMENT=production`, `SUPABASE_ANON_KEY` é obrigatória.**
+
+Para o JWT ser aceito pelo PostgREST, `SECRET_KEY` deve ser o **JWT Secret** do projeto Supabase (o mesmo usado pelo Auth/API do projeto).
+
+## Isolamento
 
 1. JWT contém `organizacao_id` e `turma_id`
-2. `obter_usuario_atual` revalida o usuário no banco
+2. `obter_usuario_atual` revalida o usuário no banco e faz bind do cliente RLS
 3. Rotas chamam `resolver_turma_id` / `validar_turma_na_organizacao` / `garantir_talento_na_turma`
+4. Com ANON_KEY, o banco aplica a segunda linha de defesa (RLS)
 
-## Risco residual
+## Dev sem ANON_KEY
 
-Um bug em filtro de `turma_id` / `organizacao_id` no código Python pode vazar dados entre tenants, porque o banco não aplica a segunda linha de defesa (RLS) nessas chamadas.
+Sem `SUPABASE_ANON_KEY`, o request path continua no service_role (comportamento anterior). Use só em desenvolvimento local.
 
-## Mitigações neste ciclo
+## Seed e migrações
 
-- Remoção do seed automático de usuários demo no boot
-- Seed demo apenas via `python -m scripts.seed_demo`
-- Validação de JWT no middleware do Next.js (assinatura + exp)
-- Cookie Secure alinhado ao ambiente
-- CORS configurável por env
-- Função destrutiva `limpar_talentos` isolada (somente script interno)
-
-## Fase futura (RLS real)
-
-1. Emitir/propagar JWT do usuário para o PostgREST (ou impersonation controlada)
-2. Usar chave `anon`/`authenticated` no request path com RLS ativa
-3. Reservar service_role a jobs administrativos auditados
+- Seed: `python -m scripts.seed_demo` (senhas via `DEMO_PASSWORD_*`; bloqueado em prod sem `SEED_ALLOW_PRODUCTION=1`)
+- `007_repair_usuarios.sql` vive em `backend/supabase/manual/` (one-shot; **não** é migração automática)

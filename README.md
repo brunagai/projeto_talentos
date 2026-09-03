@@ -9,7 +9,7 @@ Plataforma modular de gestão e avaliação de talentos — FastAPI + Supabase (
 | [Guia da Plataforma](docs/GUIA_DA_PLATAFORMA.md) | Gestores, mentores, RH | O que é, para que serve e como usar (sem jargão técnico) |
 | [Documentação Técnica](docs/DOCUMENTACAO_TECNICA.md) | Desenvolvedores | Arquitetura, API, modelos, matchmaking e setup local |
 | [Auditoria Técnica](docs/AUDITORIA_TECNICA.md) | Arquitetos / tech leads | Revisão de segurança, escalabilidade, resiliência, a11y e performance |
-| [Tenancy e service_role](docs/TENANCY_E_SERVICE_ROLE.md) | Desenvolvedores / segurança | Isolamento multi-tenant e risco do bypass de RLS |
+| [Tenancy e service_role](docs/TENANCY_E_SERVICE_ROLE.md) | Desenvolvedores / segurança | RLS no request path e uso de service_role |
 
 ## Estrutura
 
@@ -22,22 +22,24 @@ plataforma-talentos/
 
 ## Estado da remediação
 
-A auditoria P0–P3 e os ciclos de polish/hardening foram aplicados na `main`. Destaques:
+A auditoria P0–P3 e o residual (incluindo **Fase F / RLS no request path**) estão aplicados na `main`.
 
-- Sessão em cookie **HttpOnly**; middleware Next.js valida JWT (`jose` + `AUTH_SECRET`)
-- Seed de usuários demo **fora do boot** (`python -m scripts.seed_demo`)
-- Upload com teto em chunks; I/O pesado via `asyncio.to_thread`
-- Cards com botão “Ver detalhes” (sem `<a>` aninhado em `<button>`)
-- Isolamento multi-tenant ainda é **aplicação-first** (ver [tenancy](docs/TENANCY_E_SERVICE_ROLE.md)) — **não pronto** para produção multi-tenant externa sem a Fase F (RLS real)
+- Sessão HttpOnly; middleware valida JWT
+- Com `SUPABASE_ANON_KEY`, o PostgREST aplica RLS; `service_role` só em login/seed/health/boot
+- Seed fora do boot; senhas via `DEMO_PASSWORD_*`
+- Upload em chunks; rate limit com Redis opcional
+- `/docs` desligado em production
+- `007_repair_usuarios.sql` em `backend/supabase/manual/` (one-shot)
 
-Detalhes e notas por pilar: [docs/AUDITORIA_TECNICA.md](docs/AUDITORIA_TECNICA.md).
+Detalhes: [docs/AUDITORIA_TECNICA.md](docs/AUDITORIA_TECNICA.md).
 
 ## Setup rápido (dev)
 
 ### Backend
 
 1. Copie `backend/.env.example` → `backend/.env` e preencha Supabase + `SECRET_KEY`.
-2. Instale dependências e suba a API:
+2. (Recomendado) Defina `SUPABASE_ANON_KEY` e use o **JWT Secret** do Supabase como `SECRET_KEY` para testar RLS.
+3. Instale e suba:
 
 ```bash
 cd backend
@@ -45,14 +47,14 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-3. **Usuários demo não são criados no boot.** Para popular contas locais:
+4. Seed de contas locais:
 
 ```bash
 cd backend
 python -m scripts.seed_demo
 ```
 
-Contas demo (após o seed), senha padrão `admin123`:
+Senhas: variáveis `DEMO_PASSWORD_ADMIN` (etc.) ou defaults só em development. O script **não imprime** senhas.
 
 | Papel | E-mail |
 |-------|--------|
@@ -61,14 +63,13 @@ Contas demo (após o seed), senha padrão `admin123`:
 | Mentor | `mentor@cobra-coral.com` |
 | Talento | `talento@cobra-coral.com` |
 
-Health: `GET http://127.0.0.1:8000/health` · `GET http://127.0.0.1:8000/health/live`
+Health: `GET http://127.0.0.1:8000/health`
 
 ### Frontend
 
 1. Copie `frontend/.env.example` → `frontend/.env.local`.
-2. Defina `AUTH_SECRET` com **o mesmo valor** de `SECRET_KEY` do backend (obrigatório para o middleware validar o JWT).
-3. Em HTTP local, mantenha `COOKIE_SECURE=false` (ou omita; o default em development é inseguro).
-4. Instale e suba:
+2. `AUTH_SECRET` = mesmo valor de `SECRET_KEY` do backend.
+3. Em HTTP local, `COOKIE_SECURE=false` (ou omita).
 
 ```bash
 cd frontend
@@ -76,11 +77,12 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000 — a tela de login deve aparecer (credenciais demo só na UI em `NODE_ENV=development`).
+Abra http://localhost:3000.
 
-## Observações de segurança (dev → prod)
+## Produção (checklist)
 
-- Não exponha `SUPABASE_KEY` (`service_role`) ao browser.
-- Em produção, use `ENVIRONMENT=production` (força cookie Secure) e HTTPS.
-- A migration `007_repair_usuarios.sql` contém `DROP TABLE` — **não** aplicar em pipeline automático; é script one-shot.
-- Go-live multi-tenant externo depende da Fase F descrita em `docs/TENANCY_E_SERVICE_ROLE.md`.
+- `ENVIRONMENT=production` (exige `SUPABASE_ANON_KEY`; cookie Secure; sem `/docs`)
+- `SECRET_KEY` = JWT Secret do Supabase
+- Migrations `001`–`006` + `008` aplicadas; **não** aplicar `manual/007` automaticamente
+- `REDIS_URL` recomendado se houver vários workers
+- Contas demo: não usar seed em prod (ou `SEED_ALLOW_PRODUCTION=1` + senhas fortes via env)

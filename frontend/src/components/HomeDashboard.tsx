@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 
 import Card from "./Card";
 import type { AvaliacaoFormPayload } from "./FormularioAvaliacao";
+import { Tab, TabList, TabPanel, Tabs } from "./Tabs";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { labelPapel, podeFazerUpload } from "../lib/auth";
+import { formatarNota } from "../lib/format";
 
 const UploadPlanilha = dynamic(() => import("./UploadPlanilha"), {
   loading: () => (
@@ -48,10 +50,6 @@ interface MetricasAgregadas {
 }
 
 type MetricasResult = MetricasIndividuais | MetricasAgregadas;
-
-function formatarNota(valor: number): string {
-  return valor.toFixed(2);
-}
 
 export function HomeDashboard() {
   const { usuario, logout } = useAuth();
@@ -107,43 +105,112 @@ export function HomeDashboard() {
       </p>
 
       {exibeUpload ? (
-        <nav
-          aria-label="Modos de avaliação"
-          className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
-        >
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("upload")}
-            className={[
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
-              abaAtiva === "upload"
-                ? "bg-primary text-white shadow-sm shadow-primary/30"
-                : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
-            ].join(" ")}
-            aria-pressed={abaAtiva === "upload"}
+        <Tabs value={abaAtiva} onValueChange={(v) => setAbaAtiva(v as AbaAtiva)}>
+          <TabList
+            aria-label="Modos de avaliação"
+            className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
           >
-            Upload de Planilha (Lote)
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("formulario")}
-            className={[
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
-              abaAtiva === "formulario"
-                ? "bg-primary text-white shadow-sm shadow-primary/30"
-                : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
-            ].join(" ")}
-            aria-pressed={abaAtiva === "formulario"}
-          >
-            Formulário Manual (Individual)
-          </button>
-        </nav>
-      ) : null}
+            <Tab
+              id="upload"
+              className={(ativo) =>
+                [
+                  "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
+                  ativo
+                    ? "bg-primary text-white shadow-sm shadow-primary/30"
+                    : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
+                ].join(" ")
+              }
+            >
+              Upload de Planilha (Lote)
+            </Tab>
+            <Tab
+              id="formulario"
+              className={(ativo) =>
+                [
+                  "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
+                  ativo
+                    ? "bg-primary text-white shadow-sm shadow-primary/30"
+                    : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
+                ].join(" ")
+              }
+            >
+              Formulário Manual (Individual)
+            </Tab>
+          </TabList>
 
-      <section className="w-full">
-        {abaAtiva === "upload" && exibeUpload ? (
-          <UploadPlanilha />
-        ) : (
+          <TabPanel id="upload" className="mt-6 w-full">
+            <UploadPlanilha />
+          </TabPanel>
+          <TabPanel id="formulario" className="mt-6 w-full">
+            <div className="flex flex-col gap-6">
+              <FormularioAvaliacao onSubmit={handleSubmit} />
+
+              {metricas && (
+                <Card accent className="mx-auto w-full max-w-2xl">
+                  <h2 className="text-lg font-semibold text-primary">
+                    Métricas calculadas
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    Resultado retornado pelo backend após o envio da avaliação.
+                  </p>
+
+                  <dl className="mt-6 grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
+                      <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                        Média técnica
+                      </dt>
+                      <dd className="mt-2 text-2xl font-bold text-white">
+                        {formatarNota(metricas.media_tecnica)}
+                      </dd>
+                    </div>
+
+                    <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
+                      <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                        Média socioemocional
+                      </dt>
+                      <dd className="mt-2 text-2xl font-bold text-white">
+                        {formatarNota(metricas.media_socioemocional)}
+                      </dd>
+                    </div>
+
+                    <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
+                      <dt className="text-xs uppercase tracking-wide text-primary/80">
+                        Média de competências
+                      </dt>
+                      <dd className="mt-2 text-2xl font-bold text-primary">
+                        {formatarNota(metricas.media_competencias)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {metricas.tipo === "agregada" && (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
+                        <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                          Total de horas
+                        </dt>
+                        <dd className="mt-2 text-xl font-semibold text-white">
+                          {formatarNota(metricas.total_horas_dedicadas)} h
+                        </dd>
+                      </div>
+
+                      <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
+                        <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                          Avaliações processadas
+                        </dt>
+                        <dd className="mt-2 text-xl font-semibold text-white">
+                          {metricas.quantidade_avaliacoes}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+            </div>
+          </TabPanel>
+        </Tabs>
+      ) : (
+        <section className="w-full">
           <div className="flex flex-col gap-6">
             <FormularioAvaliacao onSubmit={handleSubmit} />
 
@@ -152,10 +219,6 @@ export function HomeDashboard() {
                 <h2 className="text-lg font-semibold text-primary">
                   Métricas calculadas
                 </h2>
-                <p className="mt-1 text-sm text-zinc-400">
-                  Resultado retornado pelo backend após o envio da avaliação.
-                </p>
-
                 <dl className="mt-6 grid gap-4 sm:grid-cols-3">
                   <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
                     <dt className="text-xs uppercase tracking-wide text-zinc-500">
@@ -165,7 +228,6 @@ export function HomeDashboard() {
                       {formatarNota(metricas.media_tecnica)}
                     </dd>
                   </div>
-
                   <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
                     <dt className="text-xs uppercase tracking-wide text-zinc-500">
                       Média socioemocional
@@ -174,7 +236,6 @@ export function HomeDashboard() {
                       {formatarNota(metricas.media_socioemocional)}
                     </dd>
                   </div>
-
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
                     <dt className="text-xs uppercase tracking-wide text-primary/80">
                       Média de competências
@@ -184,33 +245,11 @@ export function HomeDashboard() {
                     </dd>
                   </div>
                 </dl>
-
-                {metricas.tipo === "agregada" && (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
-                      <dt className="text-xs uppercase tracking-wide text-zinc-500">
-                        Total de horas
-                      </dt>
-                      <dd className="mt-2 text-xl font-semibold text-white">
-                        {formatarNota(metricas.total_horas_dedicadas)} h
-                      </dd>
-                    </div>
-
-                    <div className="rounded-lg border border-card-elevated bg-surface-muted p-4">
-                      <dt className="text-xs uppercase tracking-wide text-zinc-500">
-                        Avaliações processadas
-                      </dt>
-                      <dd className="mt-2 text-xl font-semibold text-white">
-                        {metricas.quantidade_avaliacoes}
-                      </dd>
-                    </div>
-                  </div>
-                )}
               </Card>
             )}
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </>
   );
 }
