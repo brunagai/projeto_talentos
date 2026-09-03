@@ -14,6 +14,7 @@ import {
   type CargoReferencia,
   type RankingCandidato,
 } from "./matchmakingUtils";
+import { apiFetch } from "../lib/api";
 
 type AbaAtiva = "cargos" | "areas" | "talentos";
 
@@ -32,7 +33,6 @@ interface ResultadosPlanilhaProps {
   erros: string[];
   metricas: MetricasConsolidadas;
   perfis: PerfilTalentoData[];
-  apiBaseUrl: string;
 }
 
 function formatarNota(valor: number): string {
@@ -105,7 +105,6 @@ export function ResultadosPlanilha({
   erros,
   metricas,
   perfis,
-  apiBaseUrl,
 }: ResultadosPlanilhaProps) {
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("cargos");
   const [cargos, setCargos] = useState<CargoReferencia[]>([]);
@@ -119,11 +118,7 @@ export function ResultadosPlanilha({
       setCarregandoCargos(true);
       setErroCargos(null);
       try {
-        const response = await fetch(`${apiBaseUrl}/matchmaking/cargos`);
-        if (!response.ok) {
-          throw new Error("Não foi possível carregar a matriz de cargos.");
-        }
-        const data = (await response.json()) as CargoReferencia[];
+        const data = await apiFetch<CargoReferencia[]>("/matchmaking/cargos");
         if (!cancelado) {
           setCargos(data);
         }
@@ -146,7 +141,7 @@ export function ResultadosPlanilha({
     return () => {
       cancelado = true;
     };
-  }, [apiBaseUrl]);
+  }, []);
 
   const rankings = useMemo(
     () => montarRankings(cargos, perfis),

@@ -39,16 +39,23 @@ def _executar(operacao: str, callback: Any) -> Any:
         raise TalentosStoreError(f"Erro inesperado ao {operacao}: {exc}") from exc
 
 
-def _obter_turma_id(turma_id: str | None = None) -> str:
+def _obter_turma_id(
+    turma_id: str | None = None,
+    organizacao_id: str | None = None,
+) -> str:
     if turma_id is not None:
         return _validar_uuid(turma_id, "turma_id")
 
+    from app.services.auth_store import garantir_organizacao_padrao
+
+    org_resolvida = organizacao_id or garantir_organizacao_padrao()
     client = get_supabase()
     existente = _executar(
         "buscar turma padrão",
         lambda: client.table("turmas")
         .select("id")
         .eq("nome", DEFAULT_TURMA_NOME)
+        .eq("organizacao_id", org_resolvida)
         .limit(1)
         .execute(),
     )
@@ -62,6 +69,7 @@ def _obter_turma_id(turma_id: str | None = None) -> str:
             {
                 "nome": DEFAULT_TURMA_NOME,
                 "descricao": "Turma criada automaticamente para uploads sem cohort definido",
+                "organizacao_id": org_resolvida,
             }
         )
         .execute(),
@@ -69,9 +77,9 @@ def _obter_turma_id(turma_id: str | None = None) -> str:
     return criada.data[0]["id"]
 
 
-def garantir_turma_padrao() -> str:
+def garantir_turma_padrao(organizacao_id: str | None = None) -> str:
     """Garante que a turma padrão existe e retorna seu ID."""
-    return _obter_turma_id()
+    return _obter_turma_id(organizacao_id=organizacao_id)
 
 
 def _talento_para_resposta(row: dict[str, Any]) -> dict[str, Any]:

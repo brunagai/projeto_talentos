@@ -1,8 +1,9 @@
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id
 from app.models.avaliacao import AvaliacaoSemanalCreate
 from app.services.metricas_service import MetricasCalculationError, MetricasService
 from app.services.planilha_service import (
@@ -77,6 +78,7 @@ def _validar_extensao(nome_arquivo: str | None) -> str:
 @router.post("/metricas", response_model=MetricasResponse)
 def calcular_metricas(
     payload: AvaliacaoSemanalCreate | list[AvaliacaoSemanalCreate],
+    _: Annotated[UsuarioAutenticado, Depends(exigir_papeis(Papel.ADMIN, Papel.RECRUTADOR, Papel.MENTOR, Papel.TALENTO))],
 ) -> MetricasResponse:
     """Calcula métricas sintéticas a partir de uma ou mais autoavaliações semanais."""
     try:
@@ -101,7 +103,13 @@ def calcular_metricas(
 
 
 @router.post("/upload", response_model=UploadMetricasResponse)
-async def upload_avaliacoes(arquivo: UploadFile = File(...)) -> UploadMetricasResponse:
+async def upload_avaliacoes(
+    arquivo: UploadFile = File(...),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(exigir_papeis(Papel.ADMIN, Papel.RECRUTADOR, Papel.MENTOR)),
+    ] = None,
+) -> UploadMetricasResponse:
     """Recebe planilha CSV/XLSX, mapeia linhas e retorna métricas e perfis granulares."""
     _validar_extensao(arquivo.filename)
     conteudo = await arquivo.read()
@@ -144,6 +152,7 @@ async def upload_avaliacoes(arquivo: UploadFile = File(...)) -> UploadMetricasRe
     }
 
     try:
+        turma_id = resolver_turma_id(usuario)
         salvar_talentos(
             [
                 {
@@ -171,7 +180,8 @@ async def upload_avaliacoes(arquivo: UploadFile = File(...)) -> UploadMetricasRe
                     "link_linkedin": perfil.link_linkedin,
                 }
                 for perfil in resultado.perfis
-            ]
+            ],
+            turma_id=turma_id,
         )
     except TalentosStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id, verificar_acesso_talento
 from app.models.avaliacao_gestor import AvaliacaoGestorCreate
 from app.services.gestor_store import (
     GestorStoreError,
@@ -31,15 +34,19 @@ class AvaliacaoGestorResponse(BaseModel):
 @router.post("/avaliacoes", response_model=AvaliacaoGestorResponse)
 def registrar_avaliacao_gestor(
     payload: AvaliacaoGestorCreate,
-    turma_id: str | None = Query(
-        default=None,
-        description="ID da turma. Se omitido, usa a turma padrão.",
-    ),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(exigir_papeis(Papel.ADMIN, Papel.MENTOR)),
+    ],
 ) -> AvaliacaoGestorResponse:
     """Registra ou atualiza a avaliação formal do gestor para um talento/semana."""
     try:
         payload.validar_notas()
-        resultado = salvar_avaliacao_gestor(payload.model_dump(mode="json"), turma_id=turma_id)
+        turma_id = resolver_turma_id(usuario)
+        resultado = salvar_avaliacao_gestor(
+            payload.model_dump(mode="json"),
+            turma_id=turma_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except GestorStoreError as exc:
@@ -52,10 +59,17 @@ def registrar_avaliacao_gestor(
 def obter_avaliacao_gestor(
     talento_id: str,
     semana_numero: int = Query(..., ge=1),
-    turma_id: str | None = Query(default=None),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ] = None,
 ) -> AvaliacaoGestorResponse:
     """Busca a avaliação do gestor para um talento em uma semana específica."""
+    verificar_acesso_talento(usuario, talento_id)
     try:
+        turma_id = resolver_turma_id(usuario)
         resultado = buscar_avaliacao_gestor(
             talento_id,
             semana_numero,

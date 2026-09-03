@@ -10,9 +10,7 @@ import {
   separarSkills,
   skillsVazias,
 } from "./competencias";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "../lib/api";
 
 const inputClassName =
   "w-full rounded-lg border border-card-elevated bg-surface-muted px-3 py-2 text-zinc-100 placeholder:text-zinc-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30";
@@ -107,17 +105,10 @@ export function FormularioGestor({
 
     setEnviando(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/gestor/avaliacoes`, {
+      await apiFetch("/gestor/avaliacoes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          detail?: string;
-        } | null;
-        throw new Error(body?.detail ?? "Falha ao salvar avaliação do gestor.");
-      }
       setSucesso(true);
       onSalvo?.();
     } catch (error) {

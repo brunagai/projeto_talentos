@@ -3,20 +3,27 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auth import router as auth_router
 from app.api.avaliacoes import router as avaliacoes_router
 from app.api.gestor import router as gestor_router
 from app.api.matchmaking import router as matchmaking_router
 from app.api.talentos import router as talentos_router
 from app.core.database import get_supabase
+from app.services.auth_store import garantir_organizacao_padrao, garantir_usuarios_demo
 from app.services.talentos_store import garantir_turma_padrao
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Valida conexão com Supabase e garante turma padrão na inicialização."""
+    """Valida conexão com Supabase e garante dados iniciais na inicialização."""
     client = get_supabase()
     client.table("turmas").select("id").limit(1).execute()
-    garantir_turma_padrao()
+    try:
+        organizacao_id = garantir_organizacao_padrao()
+        turma_id = garantir_turma_padrao(organizacao_id=organizacao_id)
+        garantir_usuarios_demo(turma_id=turma_id, organizacao_id=organizacao_id)
+    except Exception:
+        pass
     yield
 
 
@@ -38,6 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(avaliacoes_router)
 app.include_router(gestor_router)
 app.include_router(matchmaking_router)

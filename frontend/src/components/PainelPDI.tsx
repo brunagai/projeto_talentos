@@ -4,9 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import Card from "./Card";
 import type { CargoOpcao, PdiTalento } from "./pdiTypes";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "../lib/api";
 
 interface PainelPDIProps {
   talentoId: string;
@@ -46,11 +44,7 @@ export function PainelPDI({ talentoId, semanaNumero }: PainelPDIProps) {
 
     async function carregarCargos() {
       try {
-        const response = await fetch(`${API_BASE_URL}/matchmaking/cargos`);
-        if (!response.ok) {
-          throw new Error("Falha ao carregar cargos de referência.");
-        }
-        const data = (await response.json()) as CargoOpcao[];
+        const data = await apiFetch<CargoOpcao[]>("/matchmaking/cargos");
         if (!cancelado) {
           setCargos(data);
           if (data.length > 0) {
@@ -87,16 +81,9 @@ export function PainelPDI({ talentoId, semanaNumero }: PainelPDIProps) {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/talentos/${encodeURIComponent(talentoId)}/pdi?${params}`,
+      const data = await apiFetch<PdiTalento>(
+        `/talentos/${encodeURIComponent(talentoId)}/pdi?${params}`,
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          detail?: string;
-        } | null;
-        throw new Error(body?.detail ?? "Falha ao gerar PDI.");
-      }
-      const data = (await response.json()) as PdiTalento;
       setPdi(data);
     } catch (error) {
       setPdi(null);

@@ -7,9 +7,9 @@ import FormularioGestor from "./FormularioGestor";
 import RadarComparativo from "./RadarComparativo";
 import type { ComparativoGestorData } from "./comparativoTypes";
 import { HARD_SKILL_KEYS, SOFT_SKILL_KEYS } from "./competencias";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
+import { podeEditarGestor } from "../lib/auth";
 
 interface ComparativoGestorProps {
   talentoId: string;
@@ -41,6 +41,8 @@ export function ComparativoGestor({
   talentoId,
   semanaNumero,
 }: ComparativoGestorProps) {
+  const { usuario } = useAuth();
+  const podeEditarGestorFlag = usuario ? podeEditarGestor(usuario.papel) : false;
   const [dados, setDados] = useState<ComparativoGestorData | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -50,18 +52,11 @@ export function ComparativoGestor({
     setCarregando(true);
     setErro(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/talentos/${encodeURIComponent(talentoId)}/comparativo-gestor?semana_numero=${semanaNumero}`,
+      const json = await apiFetch<ComparativoGestorData>(
+        `/talentos/${encodeURIComponent(talentoId)}/comparativo-gestor?semana_numero=${semanaNumero}`,
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          detail?: string;
-        } | null;
-        throw new Error(body?.detail ?? "Falha ao carregar comparativo.");
-      }
-      const json = (await response.json()) as ComparativoGestorData;
       setDados(json);
-      setMostrarFormulario(!json.avaliacao_gestor);
+      setMostrarFormulario(podeEditarGestorFlag && !json.avaliacao_gestor);
     } catch (error) {
       setErro(
         error instanceof Error ? error.message : "Erro ao carregar comparativo.",
@@ -69,7 +64,7 @@ export function ComparativoGestor({
     } finally {
       setCarregando(false);
     }
-  }, [talentoId, semanaNumero]);
+  }, [talentoId, semanaNumero, podeEditarGestorFlag]);
 
   useEffect(() => {
     void carregar();
@@ -120,6 +115,7 @@ export function ComparativoGestor({
             </span>
           )}
         </p>
+      {podeEditarGestorFlag && (
         <button
           type="button"
           onClick={() => setMostrarFormulario((atual) => !atual)}
@@ -127,9 +123,10 @@ export function ComparativoGestor({
         >
           {mostrarFormulario ? "Ocultar formulário" : "Avaliar como gestor"}
         </button>
+      )}
       </div>
 
-      {mostrarFormulario && (
+      {mostrarFormulario && podeEditarGestorFlag && (
         <FormularioGestor
           talentoId={talentoId}
           semanaNumero={semanaNumero}

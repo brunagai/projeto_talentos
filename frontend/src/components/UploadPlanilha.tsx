@@ -5,6 +5,7 @@ import { DragEvent, useRef, useState } from "react";
 import Card from "./Card";
 import ResultadosPlanilha from "./ResultadosPlanilha";
 import type { PerfilTalentoData } from "./PerfilTalento";
+import { apiFetch } from "../lib/api";
 
 interface UploadMetricasResponse {
   arquivo: string;
@@ -21,9 +22,6 @@ interface UploadMetricasResponse {
   };
   perfis?: PerfilTalentoData[];
 }
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const EXTENSOES_PERMITIDAS = [".csv", ".xlsx"];
 
@@ -91,19 +89,10 @@ export function UploadPlanilha() {
       const formData = new FormData();
       formData.append("arquivo", arquivo);
 
-      const response = await fetch(`${API_BASE_URL}/avaliacoes/upload`, {
+      const data = await apiFetch<UploadMetricasResponse>("/avaliacoes/upload", {
         method: "POST",
         body: formData,
       });
-
-      if (!response.ok) {
-        const errorBody = (await response.json().catch(() => null)) as {
-          detail?: string;
-        } | null;
-        throw new Error(errorBody?.detail ?? "Falha ao processar a planilha.");
-      }
-
-      const data = (await response.json()) as UploadMetricasResponse;
       setResultado(data);
     } catch (error) {
       setResultado(null);
@@ -194,7 +183,6 @@ export function UploadPlanilha() {
           erros={resultado.erros}
           metricas={resultado.metricas}
           perfis={resultado.perfis ?? []}
-          apiBaseUrl={API_BASE_URL}
         />
       )}
     </div>

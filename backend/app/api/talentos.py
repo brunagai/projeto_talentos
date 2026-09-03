@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id, verificar_acesso_talento
 from app.services.gestor_store import GestorStoreError, obter_comparativo_gestor
 from app.services.pdi_service import PdiServiceError, gerar_pdi
 from app.services.talentos_store import TalentosStoreError, listar_historico_talento
@@ -38,13 +41,17 @@ class HistoricoTalentoResponse(BaseModel):
 @router.get("/{talento_id}/historico", response_model=HistoricoTalentoResponse)
 def obter_historico_talento(
     talento_id: str,
-    turma_id: str | None = Query(
-        default=None,
-        description="ID da turma. Se omitido, usa a turma padrão.",
-    ),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ],
 ) -> HistoricoTalentoResponse:
     """Retorna a série temporal de avaliações semanais de um talento."""
+    verificar_acesso_talento(usuario, talento_id)
     try:
+        turma_id = resolver_turma_id(usuario)
         historico = listar_historico_talento(talento_id, turma_id=turma_id)
     except TalentosStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -136,13 +143,17 @@ class ComparativoGestorResponse(BaseModel):
 def comparativo_gestor(
     talento_id: str,
     semana_numero: int = Query(..., ge=1),
-    turma_id: str | None = Query(
-        default=None,
-        description="ID da turma. Se omitido, usa a turma padrão.",
-    ),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ] = None,
 ) -> ComparativoGestorResponse:
     """Cruza autopercepção do estagiário com a avaliação formal do gestor."""
+    verificar_acesso_talento(usuario, talento_id)
     try:
+        turma_id = resolver_turma_id(usuario)
         comparativo = obter_comparativo_gestor(
             talento_id,
             semana_numero,
@@ -220,10 +231,17 @@ def obter_pdi_talento(
         ge=1,
         description="Semana de referência. Se omitida, usa a mais recente.",
     ),
-    turma_id: str | None = Query(default=None),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ] = None,
 ) -> PdiTalentoResponse:
     """Gera PDI automatizado com metas, prazos e ações práticas."""
+    verificar_acesso_talento(usuario, talento_id)
     try:
+        turma_id = resolver_turma_id(usuario)
         pdi = gerar_pdi(
             talento_id,
             cargo_alvo,

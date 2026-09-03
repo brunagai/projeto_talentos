@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     SUPABASE_URL: AnyHttpUrl
     SUPABASE_KEY: str = Field(min_length=1)
     SECRET_KEY: str = Field(min_length=1)
+    JWT_EXPIRE_MINUTES: int = 60 * 12
+    SUPABASE_JWT_SECRET: str | None = None
 
     @field_validator("DATABASE_URL", "SUPABASE_KEY", "SECRET_KEY", mode="before")
     @classmethod

@@ -7,3 +7,5 @@ python-dotenv
 python-multipart
 pandas
 openpyxl
+PyJWT
+bcrypt

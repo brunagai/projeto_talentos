@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import Card from "../components/Card";
 import FormularioAvaliacao, {
   type AvaliacaoFormPayload,
 } from "../components/FormularioAvaliacao";
 import UploadPlanilha from "../components/UploadPlanilha";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
+import { labelPapel, podeFazerUpload } from "../lib/auth";
 
 type AbaAtiva = "upload" | "formulario";
 
@@ -28,82 +32,106 @@ interface MetricasAgregadas {
 
 type MetricasResult = MetricasIndividuais | MetricasAgregadas;
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 function formatarNota(valor: number): string {
   return valor.toFixed(2);
 }
 
 export default function HomePage() {
-  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("upload");
+  const { usuario, logout } = useAuth();
+  const router = useRouter();
+  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("formulario");
   const [metricas, setMetricas] = useState<MetricasResult | null>(null);
 
+  const exibeUpload = usuario ? podeFazerUpload(usuario.papel) : false;
+
+  useEffect(() => {
+    if (exibeUpload) {
+      setAbaAtiva("upload");
+    } else {
+      setAbaAtiva("formulario");
+    }
+  }, [exibeUpload]);
+
   async function handleSubmit(payload: AvaliacaoFormPayload): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/avaliacoes/metricas`, {
+    const data = await apiFetch<MetricasResult>("/avaliacoes/metricas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => null)) as {
-        detail?: string;
-      } | null;
-      throw new Error(errorBody?.detail ?? "Falha ao calcular métricas.");
-    }
-
-    const data = (await response.json()) as MetricasResult;
     setMetricas(data);
+  }
+
+  function handleLogout() {
+    logout();
+    router.replace("/login");
   }
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 sm:py-12">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="text-center">
+          <div className="mb-4 flex items-center justify-end gap-3">
+            {usuario && (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-zinc-400">
+                  {usuario.nome} · {labelPapel(usuario.papel)}
+                  {usuario.organizacao_nome ? ` · ${usuario.organizacao_nome}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-lg border border-card-elevated px-3 py-1.5 text-zinc-300 transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  Sair
+                </button>
+              </div>
+            )}
+          </div>
           <h1 className="text-3xl font-bold text-primary sm:text-4xl">
             Plataforma Talentos
           </h1>
           <p className="mt-2 text-sm text-zinc-400 sm:text-base">
-            Avalie talentos em lote por planilha ou registre uma autoavaliação
-            individual.
+            {exibeUpload
+              ? "Avalie talentos em lote por planilha ou registre uma autoavaliação individual."
+              : "Registre sua autoavaliação semanal."}
           </p>
         </header>
 
-        <nav
-          aria-label="Modos de avaliação"
-          className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
-        >
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("upload")}
-            className={[
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
-              abaAtiva === "upload"
-                ? "bg-primary text-white shadow-sm shadow-primary/30"
-                : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
-            ].join(" ")}
-            aria-pressed={abaAtiva === "upload"}
+        {exibeUpload ? (
+          <nav
+            aria-label="Modos de avaliação"
+            className="mx-auto flex w-full max-w-2xl rounded-xl border border-card-elevated bg-card p-1"
           >
-            Upload de Planilha (Lote)
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("formulario")}
-            className={[
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
-              abaAtiva === "formulario"
-                ? "bg-primary text-white shadow-sm shadow-primary/30"
-                : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
-            ].join(" ")}
-            aria-pressed={abaAtiva === "formulario"}
-          >
-            Formulário Manual (Individual)
-          </button>
-        </nav>
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("upload")}
+              className={[
+                "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
+                abaAtiva === "upload"
+                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
+              ].join(" ")}
+              aria-pressed={abaAtiva === "upload"}
+            >
+              Upload de Planilha (Lote)
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("formulario")}
+              className={[
+                "flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
+                abaAtiva === "formulario"
+                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  : "text-zinc-400 hover:bg-surface-muted hover:text-zinc-100",
+              ].join(" ")}
+              aria-pressed={abaAtiva === "formulario"}
+            >
+              Formulário Manual (Individual)
+            </button>
+          </nav>
+        ) : null}
 
         <section className="w-full">
-          {abaAtiva === "upload" ? (
+          {abaAtiva === "upload" && exibeUpload ? (
             <UploadPlanilha />
           ) : (
             <div className="flex flex-col gap-6">

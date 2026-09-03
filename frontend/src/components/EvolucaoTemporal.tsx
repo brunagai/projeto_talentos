@@ -6,9 +6,7 @@ import Card from "./Card";
 import LinksTalento from "./LinksTalento";
 import type { HistoricoTalento, SemanaHistorico, VariacaoCompetencia } from "./historicoTypes";
 import SoftSkillsRadar from "./SoftSkillsRadar";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch } from "../lib/api";
 
 const PRIMARY = "#e11d48";
 const ACCENT = "#38bdf8";
@@ -240,16 +238,9 @@ export function EvolucaoTemporal({ talentoId }: EvolucaoTemporalProps) {
       setErro(null);
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/talentos/${encodeURIComponent(talentoId)}/historico`,
+        const data = await apiFetch<HistoricoTalento>(
+          `/talentos/${encodeURIComponent(talentoId)}/historico`,
         );
-        if (!response.ok) {
-          const body = (await response.json().catch(() => null)) as {
-            detail?: string;
-          } | null;
-          throw new Error(body?.detail ?? "Falha ao carregar histórico.");
-        }
-        const data = (await response.json()) as HistoricoTalento;
         if (!cancelado) {
           setHistorico(data);
         }

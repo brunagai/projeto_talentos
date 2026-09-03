@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id
 from app.services.cargos_referencia import CARGOS_REFERENCIA
 from app.services.matchmaking_service import (
     MatchmakingError,
@@ -96,9 +97,10 @@ def _to_match_response(resultado: Any) -> MatchCandidatoResponse:
     )
 
 
-def _talentos_do_store() -> list[TalentoMatchInput]:
+def _talentos_do_store(usuario: UsuarioAutenticado) -> list[TalentoMatchInput]:
     try:
-        bruto = listar_talentos()
+        turma_id = resolver_turma_id(usuario)
+        bruto = listar_talentos(turma_id=turma_id)
     except TalentosStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return [TalentoMatchInput.model_validate(item) for item in bruto]
@@ -110,6 +112,12 @@ def matchmaking_cargos(
         default=None,
         description="Se informado, ranqueia os talentos persistidos para este cargo.",
     ),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ] = None,
 ) -> list[CargoResumoResponse] | RankingCargoResponse:
     """Lista cargos de referência ou ranqueia talentos para um cargo alvo."""
     if cargo_alvo is None:
@@ -119,7 +127,7 @@ def matchmaking_cargos(
         ]
 
     try:
-        talentos = _talentos_do_store()
+        talentos = _talentos_do_store(usuario)
         if not talentos:
             raise MatchmakingError(
                 "Nenhum talento persistido. Faça upload de uma planilha ou "
@@ -142,10 +150,15 @@ def matchmaking_cargos(
 def rankear_candidatos(
     payload: RankearRequest,
     cargo_alvo: str = Query(..., description="Cargo alvo da matriz de referência."),
+    usuario: Annotated[
+        UsuarioAutenticado,
+        Depends(exigir_papeis(Papel.ADMIN, Papel.RECRUTADOR)),
+    ] = None,
 ) -> RankingCargoResponse:
     """Ranqueia talentos enviados no body pelo Fit % com o cargo selecionado."""
     try:
-        salvar_talentos([item.model_dump() for item in payload.talentos])
+        turma_id = resolver_turma_id(usuario)
+        salvar_talentos([item.model_dump() for item in payload.talentos], turma_id=turma_id)
         ranking = rankear_talentos_por_cargo(payload.talentos, cargo_alvo)
     except TalentosStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -165,6 +178,12 @@ def rankear_candidatos(
 def recomendar_cargos_para_talento(
     talento: TalentoMatchInput,
     top_n: int = Query(default=3, ge=1, le=16),
+    _: Annotated[
+        UsuarioAutenticado,
+        Depends(
+            exigir_papeis(Papel.ADMIN, Papel.MENTOR, Papel.RECRUTADOR, Papel.TALENTO)
+        ),
+    ] = None,
 ) -> list[MatchCandidatoResponse]:
     """Sugere os cargos com maior Fit % para um único talento."""
     try:
