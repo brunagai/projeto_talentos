@@ -9,6 +9,7 @@ from app.api.gestor import router as gestor_router
 from app.api.matchmaking import router as matchmaking_router
 from app.api.talentos import router as talentos_router
 from app.core.database import get_supabase
+from app.core.config import settings
 from app.services.auth_store import garantir_organizacao_padrao, garantir_usuarios_demo
 from app.services.talentos_store import garantir_turma_padrao
 
@@ -21,7 +22,8 @@ async def lifespan(_: FastAPI):
     try:
         organizacao_id = garantir_organizacao_padrao()
         turma_id = garantir_turma_padrao(organizacao_id=organizacao_id)
-        garantir_usuarios_demo(turma_id=turma_id, organizacao_id=organizacao_id)
+        if settings.ENVIRONMENT.lower() not in ("production", "prod"):
+            garantir_usuarios_demo(turma_id=turma_id, organizacao_id=organizacao_id)
     except Exception:
         pass
     yield

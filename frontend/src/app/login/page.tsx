@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Card from "../../components/Card";
+import { AlertErro } from "../../components/AlertErro";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/api";
 
@@ -91,11 +92,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {erro && (
-              <p className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
-                {erro}
-              </p>
-            )}
+            {erro && <AlertErro>{erro}</AlertErro>}
 
             <button
               type="submit"

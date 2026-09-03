@@ -3,6 +3,7 @@
 import { DragEvent, useRef, useState } from "react";
 
 import Card from "./Card";
+import { AlertErro } from "./AlertErro";
 import ResultadosPlanilha from "./ResultadosPlanilha";
 import type { PerfilTalentoData } from "./PerfilTalento";
 import { apiFetch } from "../lib/api";
@@ -160,9 +161,9 @@ export function UploadPlanilha() {
         </div>
 
         {erro && (
-          <p className="mt-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
+          <AlertErro className="mt-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
             {erro}
-          </p>
+          </AlertErro>
         )}
 
         <button

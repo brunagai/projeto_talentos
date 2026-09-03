@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.core.auth import Papel, UsuarioAutenticado, criar_token_acesso, obter_usuario_atual
+from app.core.config import settings
+from app.core.rate_limit import verificar_rate_limit
 from app.services.auth_store import AuthStoreError, autenticar_usuario
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -17,8 +19,6 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
     usuario: "UsuarioResponse"
 
 
@@ -46,9 +46,32 @@ def _usuario_para_resposta(usuario: dict) -> UsuarioResponse:
     )
 
 
+def _definir_cookie_sessao(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.JWT_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest) -> LoginResponse:
-    """Autentica usuário e retorna JWT de sessão."""
+def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+) -> LoginResponse:
+    """Autentica usuário e define cookie HttpOnly de sessão."""
+    client_ip = request.client.host if request.client else "unknown"
+    verificar_rate_limit(
+        f"login:{client_ip}",
+        max_tentativas=settings.LOGIN_RATE_LIMIT_ATTEMPTS,
+        janela_segundos=settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
     try:
         usuario = autenticar_usuario(payload.email, payload.senha)
     except AuthStoreError as exc:
@@ -61,10 +84,21 @@ def login(payload: LoginRequest) -> LoginResponse:
         )
 
     token = criar_token_acesso(usuario)
-    return LoginResponse(
-        access_token=token,
-        usuario=_usuario_para_resposta(usuario),
+    _definir_cookie_sessao(response, token)
+    return LoginResponse(usuario=_usuario_para_resposta(usuario))
+
+
+@router.post("/logout")
+def logout(response: Response) -> dict[str, bool]:
+    """Encerra a sessão removendo o cookie de autenticação."""
+    response.delete_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
     )
+    return {"ok": True}
 
 
 @router.get("/me", response_model=UsuarioResponse)

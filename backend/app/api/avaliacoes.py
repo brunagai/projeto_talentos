@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id
+from app.core.config import settings
 from app.models.avaliacao import AvaliacaoSemanalCreate
 from app.services.metricas_service import MetricasCalculationError, MetricasService
 from app.services.planilha_service import (
@@ -116,6 +117,13 @@ async def upload_avaliacoes(
 
     if not conteudo:
         raise HTTPException(status_code=400, detail="Arquivo enviado está vazio.")
+
+    if len(conteudo) > settings.MAX_UPLOAD_BYTES:
+        limite_mb = settings.MAX_UPLOAD_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"Arquivo excede o limite de {limite_mb} MB.",
+        )
 
     try:
         resultado = processar_planilha(arquivo.filename or "planilha", conteudo)

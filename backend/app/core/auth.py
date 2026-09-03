@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Annotated, Callable
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -16,7 +16,6 @@ from app.core.config import settings
 bearer_scheme = HTTPBearer(auto_error=False)
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_MINUTES = 60 * 12
 
 
 class Papel(str, Enum):
@@ -48,7 +47,7 @@ class UsuarioAutenticado(BaseModel):
 
 
 def criar_token_acesso(usuario: dict[str, str | None]) -> str:
-    expira = datetime.now(UTC) + timedelta(minutes=JWT_EXPIRE_MINUTES)
+    expira = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": str(usuario["id"]),
         "email": usuario["email"],
@@ -106,8 +105,15 @@ def verificar_token_supabase(token: str) -> TokenPayload | None:
 
 async def obter_usuario_atual(
     credenciais: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    access_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,
 ) -> UsuarioAutenticado:
-    if credenciais is None or not credenciais.credentials:
+    token: str | None = None
+    if credenciais is not None and credenciais.credentials:
+        token = credenciais.credentials
+    elif access_token:
+        token = access_token
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autenticação necessária.",
@@ -116,7 +122,6 @@ async def obter_usuario_atual(
 
     from app.services.auth_store import buscar_usuario_por_id
 
-    token = credenciais.credentials
     payload = decodificar_token(token)
     usuario = buscar_usuario_por_id(payload.sub)
     if usuario is None or not usuario.get("ativo", True):

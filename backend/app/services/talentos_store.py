@@ -127,24 +127,23 @@ def salvar_talentos(
     client = get_supabase()
     turma_resolvida = _obter_turma_id(turma_id)
 
+    registros_talentos: list[dict[str, Any]] = []
+    registros_avaliacoes: list[dict[str, Any]] = []
+
     for item in talentos:
         talento_id = _validar_uuid(str(item["talento_id"]), "talento_id")
         hard_skills = item.get("hard_skills") or {}
         soft_skills = item.get("soft_skills") or {}
 
-        registro_talento = {
-            "id": talento_id,
-            "turma_id": turma_resolvida,
-            "email": item.get("email"),
-            "nome": item.get("nome"),
-            "hard_skills": hard_skills,
-            "soft_skills": soft_skills,
-        }
-        _executar(
-            "salvar talento",
-            lambda payload=registro_talento: client.table("talentos")
-            .upsert(payload, on_conflict="id")
-            .execute(),
+        registros_talentos.append(
+            {
+                "id": talento_id,
+                "turma_id": turma_resolvida,
+                "email": item.get("email"),
+                "nome": item.get("nome"),
+                "hard_skills": hard_skills,
+                "soft_skills": soft_skills,
+            }
         )
 
         semana = item.get("semana_numero", semana_numero)
@@ -179,10 +178,20 @@ def salvar_talentos(
         if item.get("fit_vaga") is not None:
             registro_avaliacao["fit_vaga"] = item["fit_vaga"]
 
+        registros_avaliacoes.append(registro_avaliacao)
+
+    _executar(
+        "salvar talentos em lote",
+        lambda: client.table("talentos")
+        .upsert(registros_talentos, on_conflict="id")
+        .execute(),
+    )
+
+    if registros_avaliacoes:
         _executar(
-            "salvar avaliação semanal",
-            lambda payload=registro_avaliacao: client.table("avaliacoes_semanais")
-            .upsert(payload, on_conflict="talento_id,semana_numero")
+            "salvar avaliações semanais em lote",
+            lambda: client.table("avaliacoes_semanais")
+            .upsert(registros_avaliacoes, on_conflict="talento_id,semana_numero")
             .execute(),
         )
 

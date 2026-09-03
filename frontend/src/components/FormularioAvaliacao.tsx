@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 
 import Card from "./Card";
+import { AlertErro } from "./AlertErro";
 
 export interface AvaliacaoFormPayload {
   talento_id: string;
@@ -370,11 +371,7 @@ export function FormularioAvaliacao({ onSubmit }: FormularioAvaliacaoProps) {
           </div>
         </section>
 
-        {erro && (
-          <p className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
-            {erro}
-          </p>
-        )}
+        {erro && <AlertErro>{erro}</AlertErro>}
 
         <button
           type="submit"

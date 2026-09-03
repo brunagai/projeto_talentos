@@ -60,8 +60,8 @@ export default function HomePage() {
     setMetricas(data);
   }
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     router.replace("/login");
   }
 
