@@ -1,16 +1,33 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Card from "./Card";
-import FormularioAvaliacao, {
-  type AvaliacaoFormPayload,
-} from "./FormularioAvaliacao";
-import UploadPlanilha from "./UploadPlanilha";
+import type { AvaliacaoFormPayload } from "./FormularioAvaliacao";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { labelPapel, podeFazerUpload } from "../lib/auth";
+
+const UploadPlanilha = dynamic(() => import("./UploadPlanilha"), {
+  loading: () => (
+    <p className="text-center text-sm text-zinc-400" aria-busy="true">
+      Carregando upload…
+    </p>
+  ),
+});
+
+const FormularioAvaliacao = dynamic(
+  () => import("./FormularioAvaliacao").then((mod) => mod.FormularioAvaliacao),
+  {
+    loading: () => (
+      <p className="text-center text-sm text-zinc-400" aria-busy="true">
+        Carregando formulário…
+      </p>
+    ),
+  },
+);
 
 type AbaAtiva = "upload" | "formulario";
 

@@ -104,33 +104,34 @@ export function AbaCargos({ rankings }: AbaCargosProps) {
                 {listaCompleta.map((candidato, index) => (
                   <li
                     key={`${item.cargo}-${candidato.talento_id}-${candidato.semana_numero}`}
-                    className="relative"
+                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-muted"
                   >
-                    <button
-                      type="button"
-                      onClick={() => abrirDetalhe(candidato)}
-                      className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      aria-label={`Ver detalhes de ${nomeExibicao(candidato)}`}
-                    />
-                    <div className="pointer-events-none relative z-10 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm">
-                      <span className="min-w-0 truncate text-zinc-200">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-zinc-200">
                         <span className="font-medium text-primary">
                           {index + 1}.
                         </span>{" "}
                         {nomeExibicao(candidato)}
+                      </p>
+                      <div className="mt-1">
+                        <LinksTalento
+                          linkLinkedin={candidato.link_linkedin}
+                          linkProjeto={candidato.link_projeto}
+                          tamanho="sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold tabular-nums text-primary">
+                        {candidato.fit_percentual.toFixed(0)}%
                       </span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        <span className="pointer-events-auto">
-                          <LinksTalento
-                            linkLinkedin={candidato.link_linkedin}
-                            linkProjeto={candidato.link_projeto}
-                            tamanho="sm"
-                          />
-                        </span>
-                        <span className="font-semibold tabular-nums text-primary">
-                          {candidato.fit_percentual.toFixed(0)}%
-                        </span>
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => abrirDetalhe(candidato)}
+                        className="rounded-md border border-card-elevated px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-primary/40 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        Detalhes
+                      </button>
                     </div>
                   </li>
                 ))}

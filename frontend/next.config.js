@@ -4,6 +4,8 @@ const isDev = process.env.NODE_ENV !== "production";
 
 function contentSecurityPolicy() {
   const connectSrc = ["'self'"];
+  // Next.js ainda injeta bootstrap inline; nonce completo fica para Fase F.
+  // Bloqueamos handlers inline via script-src-attr.
   const scriptSrc = ["'self'", "'unsafe-inline'"];
 
   if (isDev) {
@@ -19,6 +21,8 @@ function contentSecurityPolicy() {
   const directives = [
     "default-src 'self'",
     `script-src ${scriptSrc.join(" ")}`,
+    "script-src-attr 'none'",
+    // Tailwind / estilos runtime do App Router
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -27,6 +31,8 @@ function contentSecurityPolicy() {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
   ];
 
   if (!isDev) {

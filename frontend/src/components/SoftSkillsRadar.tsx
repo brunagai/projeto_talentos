@@ -59,6 +59,10 @@ export function SoftSkillsRadar({
 
   const values = skills.map((skill) => skill.valor);
   const polygon = buildPolygonPoints(values, MAX_SCORE);
+  const listaId = `radar-lista-${titulo.replace(/\s+/g, "-").toLowerCase()}`;
+  const resumoAria = skills
+    .map((skill) => `${skill.nome}: ${skill.valor.toFixed(1)}`)
+    .join("; ");
 
   return (
     <Card className={`bg-surface ${className}`.trim()}>
@@ -72,7 +76,8 @@ export function SoftSkillsRadar({
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           className="mx-auto h-auto w-full max-w-sm"
           role="img"
-          aria-label="Gráfico de radar das soft skills"
+          aria-label={`${titulo}. ${resumoAria}`}
+          aria-describedby={listaId}
         >
           {levels.map((level) => {
             const radius = (level / MAX_SCORE) * RADIUS;
@@ -149,7 +154,11 @@ export function SoftSkillsRadar({
           })}
         </svg>
 
-        <ul className="w-full space-y-2 lg:max-w-xs">
+        <ul
+          id={listaId}
+          className="w-full space-y-2 lg:max-w-xs"
+          aria-label={`Valores numéricos: ${titulo}`}
+        >
           {skills.map((skill) => (
             <li
               key={skill.nome}

@@ -68,7 +68,16 @@ export function RadarComparativo({
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="mx-auto h-auto w-full max-w-sm"
         role="img"
-        aria-label={titulo}
+        aria-label={`${titulo}. Autopercepção e gestor por competência: ${competencias
+          .map(
+            (nome) =>
+              `${nome} auto ${Number(auto[nome] ?? 0).toFixed(1)}${
+                gestor
+                  ? `, gestor ${Number(gestor[nome] ?? 0).toFixed(1)}`
+                  : ""
+              }`,
+          )
+          .join("; ")}`}
       >
         {[1, 2, 3, 4, 5].map((level) => {
           const radius = (level / MAX_SCORE) * RADIUS;

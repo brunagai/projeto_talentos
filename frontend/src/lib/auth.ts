@@ -19,15 +19,6 @@ export function podeFazerUpload(papel: PapelUsuario): boolean {
   return papel === "admin" || papel === "recrutador" || papel === "mentor";
 }
 
-export function podeVerGestor(papel: PapelUsuario): boolean {
-  return (
-    papel === "admin" ||
-    papel === "recrutador" ||
-    papel === "mentor" ||
-    papel === "talento"
-  );
-}
-
 export function podeEditarGestor(papel: PapelUsuario): boolean {
   return papel === "admin" || papel === "mentor";
 }

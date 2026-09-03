@@ -136,6 +136,12 @@ def matchmaking_cargos(
             for cargo in CARGOS_REFERENCIA
         ]
 
+    if usuario.papel == Papel.TALENTO:
+        raise HTTPException(
+            status_code=403,
+            detail="Talentos não podem ranquear a turma completa.",
+        )
+
     try:
         talentos = _talentos_do_store(usuario, page=page, page_size=page_size)
         if not talentos:

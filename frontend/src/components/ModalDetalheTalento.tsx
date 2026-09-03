@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from "react";
 
 import LinksTalento from "./LinksTalento";
 import SoftSkillsRadar from "./SoftSkillsRadar";
-import { useAuth } from "../context/AuthContext";
-import { podeVerGestor, type PapelUsuario } from "../lib/auth";
 import type { SkillScore } from "./skillTypes";
 import type { PerfilTalentoData } from "./PerfilTalento";
 
@@ -92,9 +90,6 @@ export function ModalDetalheTalento({
 }: ModalDetalheTalentoProps) {
   const [abaAtiva, setAbaAtiva] = useState<AbaModal>("perfil");
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { usuario } = useAuth();
-  const papel: PapelUsuario | null = usuario?.papel ?? null;
-  const exibeAbaGestor = papel ? podeVerGestor(papel) : true;
 
   useEffect(() => {
     if (!aberto || !dialogRef.current) {
@@ -278,21 +273,19 @@ export function ModalDetalheTalento({
           >
             Evolução temporal
           </button>
-          {exibeAbaGestor && (
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("gestor")}
-              aria-pressed={abaAtiva === "gestor"}
-              className={[
-                "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-                abaAtiva === "gestor"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-zinc-400 hover:text-zinc-200",
-              ].join(" ")}
-            >
-              Gestor & comparativo
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("gestor")}
+            aria-pressed={abaAtiva === "gestor"}
+            className={[
+              "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              abaAtiva === "gestor"
+                ? "border-primary text-primary"
+                : "border-transparent text-zinc-400 hover:text-zinc-200",
+            ].join(" ")}
+          >
+            Gestor & comparativo
+          </button>
           <button
             type="button"
             onClick={() => setAbaAtiva("pdi")}

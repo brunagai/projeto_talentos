@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -49,7 +50,7 @@ class HistoricoTalentoResponse(BaseModel):
 
 
 @router.get("/{talento_id}/historico", response_model=HistoricoTalentoResponse)
-def obter_historico_talento(
+async def obter_historico_talento(
     talento_id: str,
     usuario: Annotated[
         UsuarioAutenticado,
@@ -62,7 +63,11 @@ def obter_historico_talento(
     verificar_acesso_talento(usuario, talento_id)
     try:
         turma_id = resolver_turma_id(usuario)
-        historico = listar_historico_talento(talento_id, turma_id=turma_id)
+        historico = await asyncio.to_thread(
+            listar_historico_talento,
+            talento_id,
+            turma_id=turma_id,
+        )
     except TalentosStoreError as exc:
         raise _http_de_servico(exc) from exc
 
@@ -150,7 +155,7 @@ class ComparativoGestorResponse(BaseModel):
 
 
 @router.get("/{talento_id}/comparativo-gestor", response_model=ComparativoGestorResponse)
-def comparativo_gestor(
+async def comparativo_gestor(
     talento_id: str,
     semana_numero: int = Query(..., ge=1),
     usuario: Annotated[
@@ -164,7 +169,8 @@ def comparativo_gestor(
     verificar_acesso_talento(usuario, talento_id)
     try:
         turma_id = resolver_turma_id(usuario)
-        comparativo = obter_comparativo_gestor(
+        comparativo = await asyncio.to_thread(
+            obter_comparativo_gestor,
             talento_id,
             semana_numero,
             turma_id=turma_id,
@@ -232,7 +238,7 @@ class PdiTalentoResponse(BaseModel):
 
 
 @router.get("/{talento_id}/pdi", response_model=PdiTalentoResponse)
-def obter_pdi_talento(
+async def obter_pdi_talento(
     talento_id: str,
     cargo_alvo: str = Query(..., description="Cargo alvo para calcular gaps de desenvolvimento."),
     semana_numero: int | None = Query(
@@ -251,7 +257,8 @@ def obter_pdi_talento(
     verificar_acesso_talento(usuario, talento_id)
     try:
         turma_id = resolver_turma_id(usuario)
-        pdi = gerar_pdi(
+        pdi = await asyncio.to_thread(
+            gerar_pdi,
             talento_id,
             cargo_alvo,
             semana_numero=semana_numero,

@@ -116,8 +116,8 @@ export function ListaTalentos({
               Talentos processados
             </h3>
             <p className="mt-1 text-sm text-zinc-400">
-              {perfisNormalizados.length} registro(s) · clique em um card para
-              ver detalhes
+              {perfisNormalizados.length} registro(s) · use “Ver detalhes” para
+              abrir o perfil
             </p>
           </div>
           <p className="text-xs text-zinc-500">
@@ -132,15 +132,9 @@ export function ListaTalentos({
             return (
               <article
                 key={cardKey}
-                className="relative rounded-xl border border-card-elevated bg-surface-muted p-4 transition-colors hover:border-primary/50 hover:bg-surface"
+                className="rounded-xl border border-card-elevated bg-surface-muted p-4 transition-colors hover:border-primary/50 hover:bg-surface"
               >
-                <button
-                  type="button"
-                  onClick={() => setSelecionado(perfil)}
-                  className="absolute inset-0 z-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                  aria-label={`Ver detalhes de ${nome}`}
-                />
-                <div className="pointer-events-none relative z-10 flex items-start gap-3">
+                <div className="flex items-start gap-3">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
                     aria-hidden="true"
@@ -158,7 +152,7 @@ export function ListaTalentos({
                   </div>
                 </div>
 
-                <div className="relative z-10 mt-2">
+                <div className="mt-2">
                   <LinksTalento
                     linkLinkedin={perfil.link_linkedin}
                     linkProjeto={perfil.link_projeto}
@@ -166,7 +160,7 @@ export function ListaTalentos({
                   />
                 </div>
 
-                <dl className="pointer-events-none relative z-10 mt-4 grid grid-cols-3 gap-2">
+                <dl className="mt-4 grid grid-cols-3 gap-2">
                   <div className="rounded-lg bg-card px-2 py-2">
                     <dt className="text-[10px] uppercase tracking-wide text-zinc-500">
                       Técnica
@@ -193,9 +187,13 @@ export function ListaTalentos({
                   </div>
                 </dl>
 
-                <span className="pointer-events-none relative z-10 mt-3 inline-flex text-xs font-medium text-primary">
+                <button
+                  type="button"
+                  onClick={() => setSelecionado(perfil)}
+                  className="mt-3 inline-flex text-xs font-medium text-primary transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
                   Ver detalhes →
-                </span>
+                </button>
               </article>
             );
           })}

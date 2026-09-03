@@ -121,34 +121,35 @@ export function AbaAreas({ rankings }: AbaAreasProps) {
               {area.candidatos.map((candidato) => (
                 <li
                   key={`${area.area}-${candidato.talento_id}-${candidato.semana_numero}`}
-                  className="relative"
+                  className="flex items-start justify-between gap-3 rounded-lg border border-card-elevated bg-surface-muted px-3 py-2"
                 >
-                  <button
-                    type="button"
-                    onClick={() => setSelecionado(candidatoParaPerfil(candidato))}
-                    className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                    aria-label={`Ver detalhes de ${nomeExibicao(candidato)}`}
-                  />
-                  <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 rounded-lg border border-card-elevated bg-surface-muted px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">
-                        {nomeExibicao(candidato)}
-                      </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        Semana {candidato.semana_numero}
-                      </p>
-                      <div className="pointer-events-auto mt-1">
-                        <LinksTalento
-                          linkLinkedin={candidato.link_linkedin}
-                          linkProjeto={candidato.link_projeto}
-                          tamanho="sm"
-                        />
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {nomeExibicao(candidato)}
+                    </p>
+                    <p className="truncate text-xs text-zinc-500">
+                      Semana {candidato.semana_numero}
+                    </p>
+                    <div className="mt-1">
+                      <LinksTalento
+                        linkLinkedin={candidato.link_linkedin}
+                        linkProjeto={candidato.link_projeto}
+                        tamanho="sm"
+                      />
                     </div>
-                    <span className="shrink-0 text-sm font-bold text-primary">
-                      {candidato.fit_percentual.toFixed(0)}%
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelecionado(candidatoParaPerfil(candidato))
+                      }
+                      className="mt-2 text-xs font-medium text-primary transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
+                      Ver detalhes →
+                    </button>
                   </div>
+                  <span className="shrink-0 text-sm font-bold text-primary">
+                    {candidato.fit_percentual.toFixed(0)}%
+                  </span>
                 </li>
               ))}
             </ul>
