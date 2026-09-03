@@ -1,46 +1,55 @@
 # Auditoria Técnica — Plataforma Talentos
 
-**Data da revalidação:** 2 de setembro de 2026  
+**Data da revalidação:** 3 de setembro de 2026  
 **Escopo:** backend (FastAPI + Supabase) e frontend (Next.js 15)  
 **Critério:** 6 pilares de engenharia corporativa  
-**Baseline:** `docs/AUDITORIA_TECNICA.md` (auditoria original, nota 6,0/10)  
-**Código analisado:** branch `fix/auditoria-p0-p1` @ `b3a6b41`
+**Baseline original:** nota 6,0/10 · revalidação pós-P3: 7,2/10  
+**Código analisado:** branch `main` @ `e7f96c6` (hardening gestor/upload/sessão)
 
 ---
 
 ## Resumo executivo
 
-O roadmap **P0–P3 foi em grande parte executado**. Os bloqueadores originais (JWT no `localStorage`, upsert N+1, ausência de `/health`, `requirements.txt` sem pin, página 100% client) **não são mais o estado do código**.
+O roadmap **P0–P3** e dois ciclos posteriores (polish + hardening) **foram executados**. Os bloqueadores originais (JWT no `localStorage`, upsert N+1, ausência de `/health`, deps sem pin, página 100% client, middleware só checando presença de cookie, `gestor_nome` do payload, upload lido inteiro antes do 413, cards com `<a>` aninhado) **não são mais o estado do código**.
 
-O sistema **atinge a meta corporativa de 7/10 na média**, mas **não está pronto para produção multi-tenant externa**. A defesa em profundidade continua ilusória: RLS existe no SQL, porém o backend usa `service_role` (bypass). Middleware de cookie não valida o JWT. Credenciais demo seguem no repositório e na UI.
+A plataforma **ultrapassa a meta corporativa de 7/10 na média**, mas **ainda não está pronta para produção multi-tenant externa**. A defesa em profundidade continua incompleta: RLS existe no SQL, porém o backend usa `service_role` (bypass). Senhas demo ainda vivem no código-fonte do seed.
 
-| Pilar | Nota original | Nota atual | Delta |
-|-------|---------------|------------|-------|
-| Segurança | 5 | 7 | +2 |
-| Escalabilidade | 6 | 7 | +1 |
-| Resiliência | 6 | 7 | +1 |
-| Clean Code | 7 | 8 | +1 |
-| A11y / UX | 6 | 7 | +1 |
-| Performance | 6 | 7 | +1 |
+| Pilar | Original | Pós-P3 | Atual | Delta vs original |
+|-------|----------|--------|-------|-------------------|
+| Segurança | 5 | 7 | **8** | +3 |
+| Escalabilidade | 6 | 7 | **8** | +2 |
+| Resiliência | 6 | 7 | **8** | +2 |
+| Clean Code | 7 | 8 | **8** | +1 |
+| A11y / UX | 6 | 7 | **8** | +2 |
+| Performance | 6 | 7 | **8** | +2 |
 
-**Nota média:** 7,2/10 (antes 6,0) · **Meta:** 7/10 em todos os pilares — **atingida na média; nenhum pilar ficou abaixo de 7**
+**Nota média:** 8,0/10 (antes 6,0 · pós-P3 7,2) · **Meta 7/10:** atingida em todos os pilares
 
 ### Roadmap original × status
 
 | Item | Status |
 |------|--------|
-| P0 Seed demo gateado | Parcial — não cria em `production`, senhas ainda no código |
-| P0 Cookie HttpOnly | Resolvido |
-| P0 RLS no Supabase | Parcial — políticas existem; API não as usa |
-| P1 Batch upsert | Resolvido |
-| P1 Rate limit + limite de upload | Parcial — existe, com lacunas |
-| P1 Focus trap + `role="alert"` | Parcial |
-| P2 `talento ∈ turma` | Resolvido |
-| P2 Exceções tipadas | Parcial |
-| P2 `useCargos()` | Parcial — cache em módulo, sem SWR e sem invalidação no logout |
-| P3 Server Components + CSP | Parcial — shell RSC ok; CSP com `'unsafe-inline'` |
-| P3 Pin `requirements.txt` | Resolvido |
-| P3 `GET /health` | Resolvido |
+| P0 Seed demo gateado | **Resolvido** — fora do boot; só via `python -m scripts.seed_demo` |
+| P0 Cookie HttpOnly | **Resolvido** |
+| P0 RLS no Supabase | **Parcial** — políticas existem; API ainda usa `service_role` (Fase F) |
+| P1 Batch upsert | **Resolvido** |
+| P1 Rate limit + limite de upload | **Parcial** — teto em chunks ok; rate limit ainda in-memory |
+| P1 Focus trap + `role="alert"` | **Resolvido** no modal e `AlertErro`; tabs WAI-ARIA ainda abertas |
+| P2 `talento ∈ turma` | **Resolvido** |
+| P2 Exceções tipadas | **Resolvido** na maior parte (`status_code` / `public_message`) |
+| P2 `useCargos()` | **Parcial** — cache + invalidação no logout; sem SWR/TTL |
+| P3 Server Components + CSP | **Parcial** — shell RSC + CSP reforçado; ainda `'unsafe-inline'` em scripts |
+| P3 Pin `requirements.txt` | **Resolvido** |
+| P3 `GET /health` | **Resolvido** |
+
+### Ciclos pós-P3 (commits recentes)
+
+| Commit | Entrega |
+|--------|---------|
+| `a0f769f` | Seed fora do boot, JWT no middleware, a11y cards, `to_thread` no upload, erros tipados |
+| `5b6a470` | Paginação PostgREST, demo só em UI de development, login fresco, mensagem de senha inválida |
+| `62ffec7` | Lazy load Home/modal, CSP (`script-src-attr 'none'`), RBAC talento no matchmaking |
+| `e7f96c6` | `gestor_nome` do usuário autenticado, upload em chunks, logout no 401, invalidação de `useCargos` |
 
 ---
 
@@ -49,97 +58,57 @@ O sistema **atinge a meta corporativa de 7/10 na média**, mas **não está pron
 ### O que está bom
 
 - Cookie de sessão `HttpOnly` + `SameSite=Lax`; frontend usa `credentials: "include"` e **não** guarda JWT em `localStorage`
-- Papel recarregado do banco a cada request (`obter_usuario_atual` → `buscar_usuario_por_id`)
+- Middleware Next.js valida assinatura e expiração com `jose` + `AUTH_SECRET` (mesmo valor de `SECRET_KEY`)
+- `/login` sempre acessível; cookie inválido é limpo no redirect
+- Em 401 (fora de login/logout), `apiFetch` chama `POST /auth/logout` antes de redirecionar
+- `COOKIE_SECURE` acompanha `ENVIRONMENT=production` quando não sobrescrito
+- Papel recarregado do banco a cada request
 - JWT com `algorithms=["HS256"]` (sem `alg=none`)
 - Login com mensagem uniforme, bcrypt, throttle por IP
-- PostgREST parametrizado — sem SQL concatenado
-- Upload: extensão, arquivo vazio, teto de 10 MB (lógico)
-- Validação `talento ∈ turma` no gestor e no upload
+- Upload: extensão, vazio, **leitura em chunks** com aborto ao ultrapassar `MAX_UPLOAD_BYTES`
+- `gestor_nome` definido no servidor (`usuario.nome`); campo removido do body/UI
+- Talento **não** pode ranquear a turma inteira via matchmaking
+- Credenciais demo na UI **somente** em `NODE_ENV === "development"`
 - Headers: CSP, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy, HSTS em produção
 - Zero `dangerouslySetInnerHTML`
 
-### Achados originais
+### Achados × status atual
 
 | ID | Status | Evidência |
 |----|--------|-----------|
-| SEC-01 RLS | Parcial | `006_row_level_security.sql`; backend ainda usa `service_role` |
-| SEC-02 Demo | Parcial | Gate em `main.py`; senhas em `auth_store.py` |
-| SEC-03 localStorage | **Resolvido** | Cookie HttpOnly em `api/auth.py` |
-| SEC-04 Middleware JWT | **Aberto** | Só testa presença do cookie |
-| SEC-05 Limite upload | Parcial | Check **depois** de `arquivo.read()` |
-| SEC-06 Rate limit | Parcial | In-memory, por IP, não compartilhado entre workers |
-| SEC-07 `gestor_nome` | **Aberto** | Continua vindo do payload |
-| SEC-08 CSP | Parcial | Headers existem; `script-src 'unsafe-inline'` em prod |
-| SEC-09 Credenciais na UI | **Aberto** | Login ainda exibe `admin123` |
+| SEC-01 RLS | **Parcial** | `006_row_level_security.sql`; backend ainda usa `service_role` — ver `docs/TENANCY_E_SERVICE_ROLE.md` |
+| SEC-02 Demo | **Parcial** | Seed manual; senhas ainda em `auth_store` / script de seed |
+| SEC-03 localStorage | **Resolvido** | Cookie HttpOnly |
+| SEC-04 Middleware JWT | **Resolvido** | `frontend/src/middleware.ts` + `jose` |
+| SEC-05 Limite upload | **Resolvido** | `_ler_upload_com_limite` em `avaliacoes.py` |
+| SEC-06 Rate limit | **Parcial** | In-memory, por IP, não compartilhado entre workers |
+| SEC-07 `gestor_nome` | **Resolvido** | `gestor.py` passa `usuario.nome` |
+| SEC-08 CSP | **Parcial** | CSP reforçado; `script-src` ainda com `'unsafe-inline'` (Next.js) |
+| SEC-09 Credenciais na UI | **Resolvido** (prod) | Hint só em development |
 
 ### Críticos / altos restantes
 
-**SEC-01 / defesa em profundidade — RLS não protege a API**
+**SEC-01 / defesa em profundidade — RLS não protege a API (Fase F)**
 
-O comentário da migração admite o bypass. Qualquer `.eq("turma_id")` esquecido vaza tenant.
+Qualquer `.eq("turma_id")` esquecido no Python pode vazar tenant, porque `service_role` bypassa RLS.
 
-```1:3:backend/supabase/migrations/006_row_level_security.sql
--- Pilar 6 / Auditoria P0: Row Level Security por organização e turma
--- O backend usa service_role (bypass de RLS). Estas políticas protegem acesso direto
--- via chave anon/authenticated do Supabase, usando claims JWT customizados.
-```
+Refatoração: JWT do usuário no PostgREST (ou impersonation); `anon`/`authenticated` no request path; `service_role` só em jobs admin auditados.
 
-Refatoração: emitir JWT do Supabase (ou `set_config` com claims) **ou** chave com RLS efetivo; nunca tratar `service_role` como defesa.
+**SEC-02 — senhas demo no código**
 
-**SEC-04 + loop de sessão — cookie inválido**
+`USUARIOS_DEMO` / seed ainda embute senhas. Em produção: não commitar senhas; desativar contas demo se existirem no banco.
 
-```11:22:frontend/src/middleware.ts
-  const token = request.cookies.get("access_token")?.value;
+**SEC-06 — rate limit**
 
-  if (pathname.startsWith("/login")) {
-    if (token) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-```
+Substituir por store compartilhado (Redis) se houver múltiplos workers.
 
-`apiFetch` redireciona para `/login` em 401 **sem** chamar logout. O cookie HttpOnly permanece → middleware manda de volta para `/`.
+**NEW-01 — `007_repair_usuarios.sql`**
 
-Refatoração: em 401, `POST /auth/logout` e só então navegar; no middleware, não redirecionar `/login` só porque o cookie existe (deixar o AuthGuard confirmar a sessão) **ou** validar JWT com `jose`.
+Começa com `DROP TABLE IF EXISTS usuarios CASCADE` — tratar como script one-shot, nunca migração automática.
 
-**SEC-05 — teto depois da leitura**
+**NEW-08 — OpenAPI `/docs`**
 
-```116:126:backend/app/api/avaliacoes.py
-    conteudo = await arquivo.read()
-    ...
-    if len(conteudo) > settings.MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, ...)
-```
-
-Refatoração: ler em chunks e abortar ao ultrapassar o limite (Starlette `SpooledTemporaryFile` + teto no proxy).
-
-**SEC-02 / SEC-09 — senhas demo**
-
-```16:22:backend/app/services/auth_store.py
-USUARIOS_DEMO = [
-    {
-        "email": "admin@cobra-coral.com",
-        "senha": "admin123",
-```
-
-```25:27:frontend/src/app/login/page.tsx
-        <p className="mt-6 text-center text-xs text-zinc-500">
-          Demo: admin@cobra-coral.com / admin123
-        </p>
-```
-
-Refatoração: não commitar senhas; UI só em `NODE_ENV !== "production"`; em prod, desativar contas demo se existirem.
-
-**SEC-07 — nome do gestor controlado pelo cliente**
-
-```90:94:backend/app/services/gestor_store.py
-        "gestor_nome": payload.get("gestor_nome"),
-```
-
-Refatoração: `gestor_nome=usuario.nome` no router; ignorar o campo do body.
-
-**COOKIE_SECURE default false** — forçar `True` quando `ENVIRONMENT` for `production`.
-
-**NEW:** `007_repair_usuarios.sql` começa com `DROP TABLE IF EXISTS usuarios CASCADE` — não deve entrar em pipeline automático de migração.
+Ainda aberto em qualquer ambiente; desligar em produção.
 
 ---
 
@@ -149,31 +118,18 @@ Refatoração: `gestor_nome=usuario.nome` no router; ignorar o campo do body.
 
 - Arquitetura em camadas (`api` → `services` → stores)
 - Matchmaking em memória
-- Join embutido em listagens por semana
-- **ESC-01 resolvido:** `_upsert_lote` em chunks de 80 + lookup de e-mails em lote de 100
+- **ESC-01 resolvido:** `_upsert_lote` em chunks + lookup de e-mails em lote
+- **ESC-02 mitigado:** `asyncio.to_thread` no upload, histórico/comparativo/PDI e rotas de gestor
+- **ESC-04 mitigado:** `listar_talentos` / matchmaking usam `.range()` PostgREST
 
 ### Restantes
 
 | ID | Status | Notas |
 |----|--------|-------|
-| ESC-01 N+1 upsert | **Resolvido** | `talentos_store.py` `_upsert_lote` |
-| ESC-02 I/O no event loop | **Aberto** | `processar_planilha` + `salvar_talentos` síncronos dentro de `async def` |
+| ESC-01 N+1 upsert | **Resolvido** | |
+| ESC-02 I/O no event loop | **Parcial** | auth, matchmaking e health ainda sync no event loop |
 | ESC-03 DB a cada auth | **Aberto** | Sem cache TTL de usuário |
-| ESC-04 Paginação API | **Aberto** | `listar_talentos` é `select("*")` unbounded |
-
-**ESC-02 — bloquear o event loop no upload**
-
-```107:129:backend/app/api/avaliacoes.py
-async def upload_avaliacoes(...):
-    conteudo = await arquivo.read()
-    resultado = processar_planilha(...)
-    ...
-    salvar_talentos(...)
-```
-
-Refatoração: `await asyncio.to_thread(processar_planilha, ...)` e o mesmo para `salvar_talentos`.
-
-**ESC-04:** `limit`/`offset` (ou cursor) em `GET /talentos` e matchmaking.
+| ESC-04 Paginação API | **Resolvido** | `.range()` com page/page_size |
 
 ---
 
@@ -182,42 +138,19 @@ Refatoração: `await asyncio.to_thread(processar_planilha, ...)` e o mesmo para
 ### O que está bom
 
 - `/health` (Supabase) e `/health/live` (processo)
-- Hierarquia `AppError` + handlers de store
+- Hierarquia de erros tipados com `status_code` / `public_message` + handlers
 - Planilha acumula erros por linha
-- Deduplicação antes do upsert evita o `ON CONFLICT ... second time`
+- Lifespan loga falha com `logger.exception` (não engole em silêncio)
 
 ### Restantes
 
 | ID | Status |
 |----|--------|
-| RES-01 `except: pass` no lifespan | **Aberto** |
-| RES-02 HTTP por substring | Parcial — `AppError` existe; stores ainda mapeiam mensagem |
-| RES-03 PDI engole `GestorStoreError` | **Aberto** |
-| RES-04 `semana_numero` / notas 0–5 | Parcial — gestor ok; `AvaliacaoSemanalCreate.semana_numero` sem `ge=1` |
+| RES-01 lifespan silencioso | **Resolvido** (log); fail-fast em prod ainda opcional |
+| RES-02 HTTP por substring | **Resolvido** na maior parte |
+| RES-03 PDI engole `GestorStoreError` | **Parcial** — ainda `except GestorStoreError` sem distinguir 404 vs 503 |
+| RES-04 validação de notas/semana | **Parcial** |
 | `/health` | **Resolvido** |
-
-**RES-01**
-
-```24:30:backend/app/main.py
-    try:
-        organizacao_id = garantir_organizacao_padrao()
-        ...
-    except Exception:
-        pass
-```
-
-Refatoração: `logger.exception`; em produção, `raise`.
-
-**RES-03**
-
-```148:156:backend/app/services/pdi_service.py
-    except GestorStoreError:
-        avaliacao_gestor = None
-```
-
-Refatoração: logar; 404 → seguir sem gestor; erro de infra → 503.
-
-Falta handler global de `Exception` → 500 sanitizado (hoje stack pode vazar no default do FastAPI).
 
 ---
 
@@ -227,21 +160,19 @@ Falta handler global de `Exception` → 500 sanitizado (hoje stack pode vazar no
 
 - Routers com response models
 - Lógica pura em matchmaking / métricas / PDI
-- `apiFetch<T>` centralizado
-- `DATABASE_URL` deixou de ser obrigatório
-- `requirements.txt` com pin direto + transitivo
-- Módulo `exceptions/` e hook `useCargos`
+- `apiFetch<T>` centralizado; logout no 401
+- `requirements.txt` com pin
+- Módulo `exceptions/`; `useCargos` + `invalidarCacheCargos`
+- Removidos helpers vazios (`podeVerMatchmaking` / `podeVerGestor`) e componentes mortos associados
 
 ### Restantes
 
 | ID | Status |
 |----|--------|
 | CC-01 Imports `_executar` entre stores | **Aberto** |
-| CC-02 Config morta | Parcial — `DATABASE_URL` ainda declarado e não usado |
-| CC-03 `formatarNota` / `podeVerMatchmaking` | **Aberto** |
+| CC-02 Config morta | **Parcial** — `DATABASE_URL` declarado e não usado |
+| CC-03 `formatarNota` duplicado | **Aberto** — Home / Lista / Resultados |
 | Pin de deps | **Resolvido** |
-
-Código morto ainda presente: `verificar_token_supabase`, `limpar_talentos`, `listar_cargos`, componente `HardSkillsBars` (só o tipo é importado), `limiarMercado` no modal.
 
 ---
 
@@ -251,24 +182,21 @@ Código morto ainda presente: `verificar_token_supabase`, `limpar_talentos`, `li
 
 - `lang="pt-BR"`, `<main>` em home e login
 - Login com `htmlFor`/`id`, `autoComplete`
-- Modal: `role="dialog"`, Escape, restore de foco, trap manual de Tab
-- `AlertErro` com `role="alert"` `aria-live="assertive"` (login, upload, formulários)
-- Paginação `aria-current`; SVGs com `aria-label`; `rel="noopener noreferrer"`
+- Modal: `role="dialog"`, Escape, restore de foco, trap de Tab
+- `AlertErro` com `role="alert"` `aria-live="assertive"`
+- Cards com botão explícito “Ver detalhes” (sem `<a>` dentro de `<button>`)
+- Radars com `aria-label` e alternativa numérica
+- Paginação `aria-current`; `rel="noopener noreferrer"`
 
 ### Restantes
 
 | ID | Status |
 |----|--------|
-| A11Y-01 Focus trap | Parcial — manual, listener só no container |
+| A11Y-01 Focus trap | **Resolvido** no modal (manual) |
 | A11Y-02 Tabs WAI-ARIA | **Aberto** — `aria-pressed` em vez de `tablist`/`tab` |
-| A11Y-03 Live regions | Parcial — faltam EvolucaoTemporal, PDI, comparativo |
-| A11Y-04 Drop zone | Parcial — teclado ok, sem `aria-label` no input file |
-
-**Alto novo — `<a>` dentro de `<button>`** em `ListaTalentos`, `AbaCargos`, `AbaAreas` (`LinksTalento` filho do card clicável). Inválido para teclado e leitores de tela.
-
-Refatoração: card como `article`; botão “Ver detalhes” separado dos links.
-
-Tabs: `role="tablist"` / `tab` / `tabpanel`, setas, `aria-controls` — HomeDashboard, modal e ResultadosPlanilha.
+| A11Y-03 Live regions | **Parcial** |
+| A11Y-04 Drop zone | **Parcial** |
+| Cards aninhados inválidos | **Resolvido** |
 
 ---
 
@@ -277,76 +205,66 @@ Tabs: `role="tablist"` / `tab` / `tabpanel`, setas, `aria-controls` — HomeDash
 ### O que está bom
 
 - Shell RSC (`layout.tsx`, `page.tsx`, `login/page.tsx`)
-- Lazy *mount* de abas no modal
-- `useCargos` com cache de módulo + coalescência de in-flight
-- `useMemo` pontual em rankings e séries
-- Paginação em `ListaTalentos`
+- `next/dynamic` no modal (Evolução / Comparativo / PDI) e no Home (upload / formulário)
+- `useCargos` com cache + coalescência + **invalidação no logout**
+- Paginação em listas e na API
 
 ### Restantes
 
 | ID | Status |
 |----|--------|
-| PERF-01 Página 100% client | **Resolvido** (Providers client ainda envolve todas as rotas) |
-| PERF-02 Cache de cargos | Parcial — sem TTL, **não limpa no logout** (risco cross-org na mesma aba) |
-| PERF-03 `EvolucaoTemporal` ~568 linhas | **Aberto** — sem `next/dynamic` |
-
-`HomeDashboard` importa `UploadPlanilha` estaticamente: o grafo resultados → modal → gráficos entra no bundle inicial **mesmo para papel talento**.
-
-Refatoração: `dynamic(() => import("./UploadPlanilha"))` e o mesmo para Evolucao/PDI/Gestor; `limparCacheCargos()` no logout.
+| PERF-01 Página 100% client | **Resolvido** (Providers client ainda envolve rotas) |
+| PERF-02 Cache de cargos | **Parcial** — invalida no logout; sem TTL |
+| PERF-03 gráficos pesados | **Resolvido** via `dynamic()` |
 
 ---
 
-## Novos achados (pós-P3)
+## Achados novos × status (pós-P3)
 
-| ID | Sev | Achado |
-|----|-----|--------|
-| NEW-01 | Crítico | `007_repair_usuarios.sql` dá `DROP TABLE usuarios CASCADE` |
-| NEW-02 | Alto | Upload lê o arquivo inteiro antes do 413 |
-| NEW-03 | Alto | Loop 401 ↔ middleware por cookie stale |
-| NEW-04 | Alto | `COOKIE_SECURE` não acompanha `ENVIRONMENT=production` |
-| NEW-05 | Médio | Papel `talento` pode rankear a turma inteira via `/matchmaking/cargos` |
-| NEW-06 | Médio | Cache de cargos sobrevive ao logout |
-| NEW-07 | Médio | `<button>` aninha `<a>` nas listas |
-| NEW-08 | Médio | OpenAPI `/docs` aberto em qualquer ambiente |
-| NEW-09 | Baixo | Sem `eslint-config-next` apesar do script `lint` |
+| ID | Sev | Status | Achado |
+|----|-----|--------|--------|
+| NEW-01 | Crítico | **Aberto** (processo) | `007_repair_usuarios.sql` com `DROP TABLE` |
+| NEW-02 | Alto | **Resolvido** | Upload lia arquivo inteiro antes do 413 |
+| NEW-03 | Alto | **Resolvido** | Loop 401 ↔ cookie stale |
+| NEW-04 | Alto | **Resolvido** | `COOKIE_SECURE` alinhado a `ENVIRONMENT` |
+| NEW-05 | Médio | **Resolvido** | Talento ranqueava turma via matchmaking |
+| NEW-06 | Médio | **Resolvido** | Cache de cargos sobrevivia ao logout |
+| NEW-07 | Médio | **Resolvido** | `<button>` aninhava `<a>` |
+| NEW-08 | Médio | **Aberto** | OpenAPI `/docs` aberto |
+| NEW-09 | Baixo | **Aberto** | Sem `eslint-config-next` apesar do script `lint` |
 
 ---
 
 ## Roadmap residual (prioridade)
 
-### Ainda bloqueia produção externa
+### Ainda bloqueia produção externa (Fase F)
 
-- [ ] Não aplicar `007` como migração automática; tratar como script one-shot
-- [ ] Isolamento real de tenant (RLS efetivo **ou** revisão sistemática de todo `.eq("turma_id")`)
-- [ ] Logout no 401 + middleware que não assume cookie válido
-- [ ] Forçar `COOKIE_SECURE` em produção
-- [ ] Remover senhas demo do git e da UI de produção
-- [ ] Log + fail-fast no lifespan (`RES-01`)
+- [ ] Isolamento real de tenant: RLS efetivo no request path (ver `docs/TENANCY_E_SERVICE_ROLE.md`)
+- [ ] Não aplicar `007` como migração automática
+- [ ] Remover senhas demo do código-fonte; desativar contas demo em prod
+- [ ] Desligar `/docs` (e `/redoc`) em produção
+- [ ] (Opcional) Fail-fast no lifespan quando `ENVIRONMENT=production`
 
-### Alto impacto, sprint seguinte
+### Alto impacto / polish
 
-- [ ] `asyncio.to_thread` no upload
-- [ ] Stream/cap do body antes de alocar
-- [ ] `gestor_nome` do usuário autenticado
-- [ ] Tabs WAI-ARIA + desaninhar links dos cards
-- [ ] `dynamic()` no grafo de planilha/gráficos
-- [ ] Invalidar `useCargos` no logout
-- [ ] Distinguir 404 vs 503 no PDI
+- [ ] Rate limit distribuído (Redis)
+- [ ] CSP com nonce (remover `'unsafe-inline'` de `script-src` em prod)
+- [ ] Tabs WAI-ARIA (`tablist` / `tab` / `tabpanel`)
+- [ ] Distinguir 404 vs 503 no PDI ao falhar busca do gestor
+- [ ] `to_thread` (ou equivalente) em auth/matchmaking se o event loop saturar
 
 ### Qualidade
 
-- [ ] Paginação na API de talentos
 - [ ] Cache TTL de `buscar_usuario_por_id`
 - [ ] Extrair `_executar` / UUID para `app/db`
-- [ ] Remover código morto
-- [ ] `formatarNota` único; usar ou apagar `podeVerMatchmaking`
-- [ ] CSP com nonce (remover `'unsafe-inline'` em prod)
-- [ ] Desligar `/docs` em produção
+- [ ] Unificar `formatarNota`
+- [ ] Remover `DATABASE_URL` morto ou documentar uso futuro
+- [ ] `eslint-config-next` alinhado ao script `lint`
 
 ---
 
 ## Conclusão
 
-A plataforma **saiu de MVP frágil (6,0) para um patamar corporativo inicial (7,2)**. P0 de sessão (HttpOnly), P1 de persistência (batch upsert), P2 de invariante de turma e P3 de health/pin/RSC **estão entregues**.
+A plataforma **saiu de MVP frágil (6,0) para um patamar corporativo sólido (8,0)**. Sessão HttpOnly com JWT validado, seed controlado, upload limitado em chunks, RBAC de matchmaking, a11y dos cards, lazy load e erros tipados **estão entregues**.
 
-O que ainda impede “produção com clientes externos” não é falta de features: é **confiança no isolamento de dados** (`service_role`), **higiene de credenciais demo**, **sessão inválida** e **falhas silenciosas no boot**. Com esses itens, a nota de Segurança sobe de 7 para 8+ e o go-live deixa de ser um risco de tenant leak.
+O que ainda impede “produção com clientes externos” não é falta de features de produto: é **confiança no isolamento de dados** (`service_role` vs RLS) e **higiene de credenciais demo no repositório**. Com a Fase F e a remoção das senhas do código, a nota de Segurança sobe para 9 e o go-live deixa de ser um risco estrutural de tenant leak.
