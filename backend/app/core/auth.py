@@ -51,28 +51,34 @@ class UsuarioAutenticado(BaseModel):
 def criar_token_acesso(usuario: dict[str, str | None]) -> str:
     """Emite JWT da sessão.
 
-    Inclui `role`/`aud` = authenticated para o PostgREST aplicar RLS
-    quando `SUPABASE_ANON_KEY` está configurada. Em modo RLS, `SECRET_KEY`
-    deve ser o JWT Secret do projeto Supabase.
+    Com RLS ativo (`SUPABASE_ANON_KEY`), inclui `role`/`aud` para o PostgREST.
+    Nesse modo, `SECRET_KEY` deve ser o JWT Secret do projeto Supabase.
     """
     expira = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
-    payload = {
+    payload: dict[str, object] = {
         "sub": str(usuario["id"]),
         "email": usuario["email"],
         "papel": usuario["papel"],
         "organizacao_id": str(usuario["organizacao_id"]),
         "turma_id": str(usuario["turma_id"]) if usuario.get("turma_id") else None,
         "talento_id": str(usuario["talento_id"]) if usuario.get("talento_id") else None,
-        "role": "authenticated",
-        "aud": "authenticated",
         "exp": expira,
     }
+    if settings.rls_request_path_enabled:
+        payload["role"] = "authenticated"
+        payload["aud"] = "authenticated"
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
 def decodificar_token(token: str) -> TokenPayload:
     try:
-        dados = jwt.decode(token, settings.SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        # `aud`/`role` existem para o PostgREST (RLS); a API não exige audience.
+        dados = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_aud": False},
+        )
         return TokenPayload(
             sub=str(dados["sub"]),
             email=str(dados["email"]),

@@ -30,23 +30,30 @@ async function tokenValido(token: string): Promise<boolean> {
     return false;
   }
   try {
-    await jwtVerify(token, secret, { algorithms: ["HS256"] });
+    // Aceita tokens com ou sem `aud` (RLS). Não apaga sessão por claim extra.
+    await jwtVerify(token, secret, {
+      algorithms: ["HS256"],
+      audience: ["authenticated"],
+      requiredClaims: ["sub", "exp"],
+    });
     return true;
   } catch {
-    return false;
+    try {
+      await jwtVerify(token, secret, {
+        algorithms: ["HS256"],
+        requiredClaims: ["sub", "exp"],
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
-function limparCookieERedirecionarLogin(request: NextRequest): NextResponse {
-  const response = NextResponse.redirect(new URL("/login", request.url));
-  response.cookies.set(COOKIE_NAME, "", {
-    httpOnly: true,
-    path: "/",
-    maxAge: 0,
-    sameSite: "lax",
-    secure: cookieSecure(),
-  });
-  return response;
+function redirecionarLogin(request: NextRequest): NextResponse {
+  // Não apaga o cookie aqui: se AUTH_SECRET estiver desalinhado do backend,
+  // limpar destruiria uma sessão ainda válida para a API.
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export async function middleware(request: NextRequest) {
@@ -65,7 +72,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!valido) {
-    return limparCookieERedirecionarLogin(request);
+    return redirecionarLogin(request);
   }
 
   return NextResponse.next();

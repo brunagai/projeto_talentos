@@ -7,7 +7,6 @@ import {
   useId,
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -18,7 +17,7 @@ interface TabsContextValue {
   baseId: string;
   orientation: "horizontal" | "vertical";
   registerTab: (id: string, el: HTMLButtonElement | null) => void;
-  tabIds: string[];
+  listTabIds: () => string[];
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
@@ -48,17 +47,21 @@ export function Tabs({
 }: TabsProps) {
   const baseId = useId();
   const tabEls = useRef(new Map<string, HTMLButtonElement>());
-  const [tabIds, setTabIds] = useState<string[]>([]);
+  const tabOrder = useRef<string[]>([]);
 
   const registerTab = useCallback((id: string, el: HTMLButtonElement | null) => {
     if (el) {
       tabEls.current.set(id, el);
-      setTabIds((atual) => (atual.includes(id) ? atual : [...atual, id]));
-    } else {
-      tabEls.current.delete(id);
-      setTabIds((atual) => atual.filter((item) => item !== id));
+      if (!tabOrder.current.includes(id)) {
+        tabOrder.current = [...tabOrder.current, id];
+      }
+      return;
     }
+    tabEls.current.delete(id);
+    tabOrder.current = tabOrder.current.filter((item) => item !== id);
   }, []);
+
+  const listTabIds = useCallback(() => tabOrder.current.slice(), []);
 
   const setValue = useCallback(
     (id: string) => {
@@ -75,9 +78,9 @@ export function Tabs({
       baseId,
       orientation,
       registerTab,
-      tabIds,
+      listTabIds,
     }),
-    [value, setValue, baseId, orientation, registerTab, tabIds],
+    [value, setValue, baseId, orientation, registerTab, listTabIds],
   );
 
   return (
@@ -98,9 +101,10 @@ export function TabList({
   children,
   className,
 }: TabListProps) {
-  const { orientation, tabIds, value, setValue } = useTabsContext();
+  const { orientation, listTabIds, value, setValue } = useTabsContext();
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const tabIds = listTabIds();
     if (tabIds.length === 0) {
       return;
     }
@@ -157,9 +161,16 @@ export function Tab({ id, children, className }: TabProps) {
   const classes =
     typeof className === "function" ? className(ativo) : className;
 
+  const setRef = useCallback(
+    (el: HTMLButtonElement | null) => {
+      registerTab(id, el);
+    },
+    [id, registerTab],
+  );
+
   return (
     <button
-      ref={(el) => registerTab(id, el)}
+      ref={setRef}
       type="button"
       role="tab"
       id={`${baseId}-tab-${id}`}

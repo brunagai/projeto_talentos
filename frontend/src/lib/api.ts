@@ -61,7 +61,9 @@ export async function apiFetch<T>(
       "Sessão expirada. Faça login novamente.";
 
     const isAuthEndpoint =
-      path.startsWith("/auth/login") || path.startsWith("/auth/logout");
+      path.startsWith("/auth/login") ||
+      path.startsWith("/auth/logout") ||
+      path.startsWith("/auth/me");
 
     if (
       !isAuthEndpoint &&

@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Sempre inicia na tela de login: encerra cookie/sessão anterior ao montar.
-    async function iniciarSemSessao() {
+    // Sempre começa deslogado: encerra cookie/sessão anterior ao montar.
+    async function iniciarNaTelaDeLogin() {
       try {
         await apiFetch("/auth/logout", { method: "POST" });
       } catch {
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCarregando(false);
       }
     }
-    void iniciarSemSessao();
+    void iniciarNaTelaDeLogin();
   }, []);
 
   const login = useCallback(async (email: string, senha: string) => {
