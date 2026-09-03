@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.gestor_store import GestorStoreError, obter_comparativo_gestor
+from app.services.pdi_service import PdiServiceError, gerar_pdi
 from app.services.talentos_store import TalentosStoreError, listar_historico_talento
 
 router = APIRouter(prefix="/talentos", tags=["talentos"])
@@ -164,4 +165,94 @@ def comparativo_gestor(
             for item in comparativo["competencias"]
         ],
         resumo=ComparativoResumoResponse(**comparativo["resumo"]),
+    )
+
+
+class AcaoPdiResponse(BaseModel):
+    tipo: str
+    descricao: str
+
+
+class MetaPdiResponse(BaseModel):
+    competencia: str
+    tipo: str
+    nota_atual: float
+    nota_autopercepcao: float
+    nota_gestor: float | None = None
+    nota_meta: float
+    peso_exigido_cargo: int
+    gap_cargo: int
+    motivos: list[str]
+    prioridade: str
+    prazo_semanas: int
+    prazo_descricao: str
+    acoes: list[AcaoPdiResponse]
+
+
+class ResumoPdiResponse(BaseModel):
+    focos_abaixo_limiar: int
+    focos_gap_cargo: int
+    focos_desalinhamento_gestor: int
+    prazo_medio_semanas: float
+
+
+class PdiTalentoResponse(BaseModel):
+    talento_id: str
+    nome: str | None = None
+    email: str | None = None
+    semana_referencia: int
+    cargo_alvo: str
+    area: str
+    fit_percentual_atual: float
+    limiar_nota: float
+    total_metas: int
+    tem_avaliacao_gestor: bool
+    resumo: ResumoPdiResponse
+    metas: list[MetaPdiResponse]
+
+
+@router.get("/{talento_id}/pdi", response_model=PdiTalentoResponse)
+def obter_pdi_talento(
+    talento_id: str,
+    cargo_alvo: str = Query(..., description="Cargo alvo para calcular gaps de desenvolvimento."),
+    semana_numero: int | None = Query(
+        default=None,
+        ge=1,
+        description="Semana de referência. Se omitida, usa a mais recente.",
+    ),
+    turma_id: str | None = Query(default=None),
+) -> PdiTalentoResponse:
+    """Gera PDI automatizado com metas, prazos e ações práticas."""
+    try:
+        pdi = gerar_pdi(
+            talento_id,
+            cargo_alvo,
+            semana_numero=semana_numero,
+            turma_id=turma_id,
+        )
+    except PdiServiceError as exc:
+        status = 404 if "não encontrad" in str(exc).lower() else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+    return PdiTalentoResponse(
+        talento_id=pdi["talento_id"],
+        nome=pdi.get("nome"),
+        email=pdi.get("email"),
+        semana_referencia=pdi["semana_referencia"],
+        cargo_alvo=pdi["cargo_alvo"],
+        area=pdi["area"],
+        fit_percentual_atual=pdi["fit_percentual_atual"],
+        limiar_nota=pdi["limiar_nota"],
+        total_metas=pdi["total_metas"],
+        tem_avaliacao_gestor=pdi["tem_avaliacao_gestor"],
+        resumo=ResumoPdiResponse(**pdi["resumo"]),
+        metas=[
+            MetaPdiResponse(
+                **{
+                    **meta,
+                    "acoes": [AcaoPdiResponse(**acao) for acao in meta["acoes"]],
+                }
+            )
+            for meta in pdi["metas"]
+        ],
     )
