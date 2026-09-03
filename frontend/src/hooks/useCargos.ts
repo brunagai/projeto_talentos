@@ -8,6 +8,11 @@ import { apiFetch } from "../lib/api";
 let cacheCargos: CargoReferencia[] | null = null;
 let promessaCargos: Promise<CargoReferencia[]> | null = null;
 
+export function invalidarCacheCargos(): void {
+  cacheCargos = null;
+  promessaCargos = null;
+}
+
 export async function buscarCargosReferencia(
   forcarRecarga = false,
 ): Promise<CargoReferencia[]> {

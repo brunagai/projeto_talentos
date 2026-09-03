@@ -65,6 +65,31 @@ class UploadMetricasResponse(BaseModel):
 MetricasResponse = Union[MetricasIndividuaisResponse, MetricasAgregadasResponse]
 
 
+async def _ler_upload_com_limite(
+    arquivo: UploadFile,
+    limite_bytes: int,
+) -> bytes:
+    """Lê o upload em chunks e aborta antes de exceder o teto configurado."""
+    partes: list[bytes] = []
+    total = 0
+    chunk_size = 1024 * 1024
+
+    while True:
+        chunk = await arquivo.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limite_bytes:
+            limite_mb = limite_bytes // (1024 * 1024)
+            raise HTTPException(
+                status_code=413,
+                detail=f"Arquivo excede o limite de {limite_mb} MB.",
+            )
+        partes.append(chunk)
+
+    return b"".join(partes)
+
+
 def _validar_extensao(nome_arquivo: str | None) -> str:
     if not nome_arquivo:
         raise HTTPException(status_code=400, detail="Nome do arquivo não informado.")
@@ -115,17 +140,10 @@ async def upload_avaliacoes(
 ) -> UploadMetricasResponse:
     """Recebe planilha CSV/XLSX, mapeia linhas e retorna métricas e perfis granulares."""
     _validar_extensao(arquivo.filename)
-    conteudo = await arquivo.read()
+    conteudo = await _ler_upload_com_limite(arquivo, settings.MAX_UPLOAD_BYTES)
 
     if not conteudo:
         raise HTTPException(status_code=400, detail="Arquivo enviado está vazio.")
-
-    if len(conteudo) > settings.MAX_UPLOAD_BYTES:
-        limite_mb = settings.MAX_UPLOAD_BYTES // (1024 * 1024)
-        raise HTTPException(
-            status_code=413,
-            detail=f"Arquivo excede o limite de {limite_mb} MB.",
-        )
 
     try:
         resultado = await asyncio.to_thread(

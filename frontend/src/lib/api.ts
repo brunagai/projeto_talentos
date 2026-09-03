@@ -12,6 +12,25 @@ export class ApiError extends Error {
   }
 }
 
+let encerrandoSessao = false;
+
+async function encerrarSessaoNoServidor(): Promise<void> {
+  if (encerrandoSessao) {
+    return;
+  }
+  encerrandoSessao = true;
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    // Ignora falha de rede ao limpar cookie HttpOnly.
+  } finally {
+    encerrandoSessao = false;
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -49,6 +68,7 @@ export async function apiFetch<T>(
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login")
     ) {
+      await encerrarSessaoNoServidor();
       window.location.href = "/login";
     }
 

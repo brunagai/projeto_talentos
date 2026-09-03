@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,7 +32,7 @@ class AvaliacaoGestorResponse(BaseModel):
 
 
 @router.post("/avaliacoes", response_model=AvaliacaoGestorResponse)
-def registrar_avaliacao_gestor(
+async def registrar_avaliacao_gestor(
     payload: AvaliacaoGestorCreate,
     usuario: Annotated[
         UsuarioAutenticado,
@@ -41,16 +42,18 @@ def registrar_avaliacao_gestor(
     """Registra ou atualiza a avaliação formal do gestor para um talento/semana."""
     payload.validar_notas()
     turma_id = garantir_talento_na_turma(usuario, str(payload.talento_id))
-    resultado = salvar_avaliacao_gestor(
+    resultado = await asyncio.to_thread(
+        salvar_avaliacao_gestor,
         payload.model_dump(mode="json"),
-        turma_id=turma_id,
+        turma_id,
+        usuario.nome,
     )
 
     return AvaliacaoGestorResponse(**resultado)
 
 
 @router.get("/avaliacoes/{talento_id}", response_model=AvaliacaoGestorResponse)
-def obter_avaliacao_gestor(
+async def obter_avaliacao_gestor(
     talento_id: str,
     semana_numero: int = Query(..., ge=1),
     usuario: Annotated[
@@ -63,10 +66,11 @@ def obter_avaliacao_gestor(
     """Busca a avaliação do gestor para um talento em uma semana específica."""
     verificar_acesso_talento(usuario, talento_id)
     turma_id = garantir_talento_na_turma(usuario, talento_id)
-    resultado = buscar_avaliacao_gestor(
+    resultado = await asyncio.to_thread(
+        buscar_avaliacao_gestor,
         talento_id,
         semana_numero,
-        turma_id=turma_id,
+        turma_id,
     )
 
     if resultado is None:

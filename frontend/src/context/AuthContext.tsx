@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { apiFetch } from "../lib/api";
+import { invalidarCacheCargos } from "../hooks/useCargos";
 import {
   type LoginResponse,
   type UsuarioAuth,
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // Ignora falha de rede; o estado local já fica deslogado.
       } finally {
+        invalidarCacheCargos();
         setUsuario(null);
         setCarregando(false);
       }
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignora falha de rede no logout local.
     }
+    invalidarCacheCargos();
     setUsuario(null);
   }, []);
 

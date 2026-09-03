@@ -22,7 +22,6 @@ export interface FormularioGestorProps {
   talentoId: string;
   semanaNumero: number;
   valoresIniciais?: {
-    gestor_nome?: string | null;
     hard_skills?: Record<string, number>;
     soft_skills?: Record<string, number>;
     feedback_performance?: string | null;
@@ -45,7 +44,6 @@ function montarEstadoInicial(
   }
 
   const estado: Record<string, string | number> = {
-    gestor_nome: valoresIniciais?.gestor_nome ?? "",
     feedback_performance: valoresIniciais?.feedback_performance ?? "",
     alinhamento_cultural: valoresIniciais?.alinhamento_cultural ?? "",
     pontos_desenvolvimento: valoresIniciais?.pontos_desenvolvimento ?? "",
@@ -95,7 +93,6 @@ export function FormularioGestor({
     const payload = {
       talento_id: talentoId,
       semana_numero: semanaNumero,
-      gestor_nome: String(form.gestor_nome).trim() || undefined,
       hard_skills,
       soft_skills,
       feedback_performance: String(form.feedback_performance).trim() || undefined,
@@ -168,19 +165,6 @@ export function FormularioGestor({
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="gestor_nome" className={labelClassName}>
-            Nome do gestor
-          </label>
-          <input
-            id="gestor_nome"
-            value={String(form.gestor_nome)}
-            onChange={(event) => atualizarCampo("gestor_nome", event.target.value)}
-            className={inputClassName}
-            placeholder="Opcional"
-          />
-        </div>
-
         {renderGrupo("Competências técnicas", HARD_SKILL_KEYS)}
         {renderGrupo("Competências socioemocionais", SOFT_SKILL_KEYS)}
 

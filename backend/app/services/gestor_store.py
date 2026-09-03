@@ -86,6 +86,7 @@ def _buscar_avaliacao_semanal_id(
 def salvar_avaliacao_gestor(
     payload: dict[str, Any],
     turma_id: str | None = None,
+    gestor_nome: str | None = None,
 ) -> dict[str, Any]:
     """Cria ou atualiza a avaliação do gestor para um talento/semana."""
     client = get_supabase()
@@ -106,7 +107,7 @@ def salvar_avaliacao_gestor(
         "turma_id": turma_resolvida,
         "talento_id": talento_uuid,
         "semana_numero": semana_numero,
-        "gestor_nome": payload.get("gestor_nome"),
+        "gestor_nome": gestor_nome,
         "hard_skills": hard_skills,
         "soft_skills": soft_skills,
         "media_tecnica": media_tecnica,

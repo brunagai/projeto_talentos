@@ -13,7 +13,6 @@ class AvaliacaoGestorCreate(BaseModel):
 
     talento_id: UUID
     semana_numero: int = Field(ge=1)
-    gestor_nome: Optional[str] = None
     hard_skills: dict[str, int] = Field(default_factory=dict)
     soft_skills: dict[str, int] = Field(default_factory=dict)
     feedback_performance: Optional[str] = None
