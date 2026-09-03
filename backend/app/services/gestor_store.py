@@ -10,6 +10,7 @@ from app.services.talentos_store import (
     _executar,
     _obter_turma_id,
     _validar_uuid,
+    validar_talento_na_turma,
 )
 from app.core.database import get_supabase
 
@@ -75,6 +76,7 @@ def salvar_avaliacao_gestor(
     client = get_supabase()
     turma_resolvida = _obter_turma_id(turma_id)
     talento_uuid = _validar_uuid(str(payload["talento_id"]), "talento_id")
+    validar_talento_na_turma(talento_uuid, turma_resolvida)
     semana_numero = int(payload["semana_numero"])
 
     hard_skills = payload.get("hard_skills") or {}

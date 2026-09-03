@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import ComparativoGestor from "./ComparativoGestor";
 import EvolucaoTemporal from "./EvolucaoTemporal";
@@ -69,26 +69,64 @@ export function ModalDetalheTalento({
   notaMinima = 4,
 }: ModalDetalheTalentoProps) {
   const [abaAtiva, setAbaAtiva] = useState<AbaModal>("perfil");
+  const dialogRef = useRef<HTMLDivElement>(null);
   const { usuario } = useAuth();
   const papel: PapelUsuario | null = usuario?.papel ?? null;
   const exibeAbaGestor = papel ? podeVerGestor(papel) : true;
 
   useEffect(() => {
-    if (!aberto) {
+    if (!aberto || !dialogRef.current) {
       return;
+    }
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const container = dialogRef.current;
+
+    function getFocusableElements(): HTMLElement[] {
+      return Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
     }
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
+    const focusable = getFocusableElements();
+    focusable[0]?.focus();
+
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
+    container.addEventListener("keydown", onKeyDown);
+
     return () => {
       document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKeyDown);
+      container.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
     };
   }, [aberto, onClose]);
 
@@ -139,6 +177,7 @@ export function ModalDetalheTalento({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-card-elevated bg-background shadow-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >

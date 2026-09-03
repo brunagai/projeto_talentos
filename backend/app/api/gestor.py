@@ -5,10 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id, verificar_acesso_talento
+from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, garantir_talento_na_turma, verificar_acesso_talento
 from app.models.avaliacao_gestor import AvaliacaoGestorCreate
 from app.services.gestor_store import (
-    GestorStoreError,
     buscar_avaliacao_gestor,
     salvar_avaliacao_gestor,
 )
@@ -40,17 +39,12 @@ def registrar_avaliacao_gestor(
     ],
 ) -> AvaliacaoGestorResponse:
     """Registra ou atualiza a avaliação formal do gestor para um talento/semana."""
-    try:
-        payload.validar_notas()
-        turma_id = resolver_turma_id(usuario)
-        resultado = salvar_avaliacao_gestor(
-            payload.model_dump(mode="json"),
-            turma_id=turma_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except GestorStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    payload.validar_notas()
+    turma_id = garantir_talento_na_turma(usuario, str(payload.talento_id))
+    resultado = salvar_avaliacao_gestor(
+        payload.model_dump(mode="json"),
+        turma_id=turma_id,
+    )
 
     return AvaliacaoGestorResponse(**resultado)
 
@@ -68,15 +62,12 @@ def obter_avaliacao_gestor(
 ) -> AvaliacaoGestorResponse:
     """Busca a avaliação do gestor para um talento em uma semana específica."""
     verificar_acesso_talento(usuario, talento_id)
-    try:
-        turma_id = resolver_turma_id(usuario)
-        resultado = buscar_avaliacao_gestor(
-            talento_id,
-            semana_numero,
-            turma_id=turma_id,
-        )
-    except GestorStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    turma_id = garantir_talento_na_turma(usuario, talento_id)
+    resultado = buscar_avaliacao_gestor(
+        talento_id,
+        semana_numero,
+        turma_id=turma_id,
+    )
 
     if resultado is None:
         raise HTTPException(

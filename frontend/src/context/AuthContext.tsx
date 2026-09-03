@@ -11,10 +11,6 @@ import {
 
 import { apiFetch } from "../lib/api";
 import {
-  clearSession,
-  getStoredUser,
-  getToken,
-  saveSession,
   type LoginResponse,
   type UsuarioAuth,
 } from "../lib/auth";
@@ -23,7 +19,7 @@ interface AuthContextValue {
   usuario: UsuarioAuth | null;
   carregando: boolean;
   login: (email: string, senha: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   atualizarPerfil: () => Promise<void>;
 }
 
@@ -34,29 +30,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [carregando, setCarregando] = useState(true);
 
   const atualizarPerfil = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUsuario(null);
-      return;
-    }
     try {
       const perfil = await apiFetch<UsuarioAuth>("/auth/me");
       setUsuario(perfil);
-      saveSession(token, perfil);
     } catch {
-      clearSession();
       setUsuario(null);
     }
   }, []);
 
   useEffect(() => {
-    const stored = getStoredUser();
-    if (stored && getToken()) {
-      setUsuario(stored);
-      void atualizarPerfil().finally(() => setCarregando(false));
-      return;
-    }
-    setCarregando(false);
+    void atualizarPerfil().finally(() => setCarregando(false));
   }, [atualizarPerfil]);
 
   const login = useCallback(async (email: string, senha: string) => {
@@ -64,12 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: "POST",
       body: JSON.stringify({ email, senha }),
     });
-    saveSession(resposta.access_token, resposta.usuario);
     setUsuario(resposta.usuario);
   }, []);
 
-  const logout = useCallback(() => {
-    clearSession();
+  const logout = useCallback(async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignora falha de rede no logout local.
+    }
     setUsuario(null);
   }, []);
 

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import Card from "./Card";
-import type { CargoOpcao, PdiTalento } from "./pdiTypes";
+import type { PdiTalento } from "./pdiTypes";
+import { useCargos } from "../hooks/useCargos";
 import { apiFetch } from "../lib/api";
 
 interface PainelPDIProps {
@@ -33,39 +34,22 @@ function labelMotivo(motivo: string): string {
 }
 
 export function PainelPDI({ talentoId, semanaNumero }: PainelPDIProps) {
-  const [cargos, setCargos] = useState<CargoOpcao[]>([]);
+  const {
+    cargos,
+    carregando: carregandoCargos,
+    erro: erroCargos,
+    cargoInicial,
+  } = useCargos({ selecionarPrimeiro: true });
   const [cargoSelecionado, setCargoSelecionado] = useState("");
   const [pdi, setPdi] = useState<PdiTalento | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelado = false;
-
-    async function carregarCargos() {
-      try {
-        const data = await apiFetch<CargoOpcao[]>("/matchmaking/cargos");
-        if (!cancelado) {
-          setCargos(data);
-          if (data.length > 0) {
-            setCargoSelecionado(data[0].cargo);
-          }
-        }
-      } catch (error) {
-        if (!cancelado) {
-          setErro(
-            error instanceof Error ? error.message : "Erro ao carregar cargos.",
-          );
-          setCarregando(false);
-        }
-      }
+    if (cargoInicial) {
+      setCargoSelecionado(cargoInicial);
     }
-
-    void carregarCargos();
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  }, [cargoInicial]);
 
   const carregarPdi = useCallback(async () => {
     if (!cargoSelecionado) {
@@ -99,10 +83,18 @@ export function PainelPDI({ talentoId, semanaNumero }: PainelPDIProps) {
     }
   }, [cargoSelecionado, carregarPdi]);
 
-  if (erro && !pdi) {
+  if ((erroCargos || erro) && !pdi) {
     return (
       <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-        {erro}
+        {erroCargos ?? erro}
+      </p>
+    );
+  }
+
+  if (carregandoCargos && !cargoSelecionado) {
+    return (
+      <p className="rounded-lg border border-card-elevated bg-surface-muted p-6 text-center text-sm text-zinc-400">
+        Carregando cargos de referência…
       </p>
     );
   }

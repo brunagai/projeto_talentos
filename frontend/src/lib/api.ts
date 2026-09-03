@@ -1,7 +1,7 @@
-import { clearSession, getToken } from "./auth";
-
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  typeof window !== "undefined"
+    ? "/api"
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000");
 
 export class ApiError extends Error {
   status: number;
@@ -17,10 +17,6 @@ export async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  const token = getToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
   if (
     options.body &&
     !(options.body instanceof FormData) &&
@@ -32,10 +28,10 @@ export async function apiFetch<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (response.status === 401) {
-    clearSession();
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
       window.location.href = "/login";
     }
@@ -45,8 +41,12 @@ export async function apiFetch<T>(
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
       detail?: string;
+      message?: string;
     } | null;
-    throw new ApiError(body?.detail ?? "Falha na requisição.", response.status);
+    throw new ApiError(
+      body?.message ?? body?.detail ?? `Falha na requisição (${response.status}).`,
+      response.status,
+    );
   }
 
   if (response.status === 204) {

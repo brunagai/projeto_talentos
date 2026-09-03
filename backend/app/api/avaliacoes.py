@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core.auth import Papel, UsuarioAutenticado, exigir_papeis, resolver_turma_id
+from app.core.config import settings
 from app.models.avaliacao import AvaliacaoSemanalCreate
 from app.services.metricas_service import MetricasCalculationError, MetricasService
 from app.services.planilha_service import (
@@ -11,7 +12,7 @@ from app.services.planilha_service import (
     SUPPORTED_EXTENSIONS,
     processar_planilha,
 )
-from app.services.talentos_store import TalentosStoreError, salvar_talentos
+from app.services.talentos_store import salvar_talentos
 
 router = APIRouter(prefix="/avaliacoes", tags=["avaliacoes"])
 
@@ -117,6 +118,13 @@ async def upload_avaliacoes(
     if not conteudo:
         raise HTTPException(status_code=400, detail="Arquivo enviado está vazio.")
 
+    if len(conteudo) > settings.MAX_UPLOAD_BYTES:
+        limite_mb = settings.MAX_UPLOAD_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"Arquivo excede o limite de {limite_mb} MB.",
+        )
+
     try:
         resultado = processar_planilha(arquivo.filename or "planilha", conteudo)
         metricas = MetricasService.calcular_agregadas(resultado.avaliacoes)
@@ -151,40 +159,37 @@ async def upload_avaliacoes(
         for avaliacao in resultado.avaliacoes
     }
 
-    try:
-        turma_id = resolver_turma_id(usuario)
-        salvar_talentos(
-            [
-                {
-                    "talento_id": perfil.talento_id,
-                    "email": perfil.email,
-                    "nome": perfil.nome,
-                    "semana_numero": perfil.semana_numero,
-                    "horas_dedicadas": (
-                        avaliacoes_por_perfil[(perfil.talento_id, perfil.semana_numero)].horas_dedicadas
-                        if (perfil.talento_id, perfil.semana_numero) in avaliacoes_por_perfil
-                        else 0.0
-                    ),
-                    "autoavaliacao_tecnica": int(round(perfil.media_tecnica)),
-                    "autoavaliacao_socioemocional": int(round(perfil.media_socioemocional)),
-                    "media_tecnica": perfil.media_tecnica,
-                    "media_socioemocional": perfil.media_socioemocional,
-                    "fit_vaga": perfil.fit_vaga,
-                    "hard_skills": perfil.hard_skills,
-                    "soft_skills": perfil.soft_skills,
-                    "feedback_case": perfil.feedback_case,
-                    "interdependencias": perfil.interdependencias,
-                    "ajustes_rota": perfil.ajustes_rota,
-                    "rituais_mentoria": perfil.rituais_mentoria,
-                    "link_projeto": perfil.link_projeto,
-                    "link_linkedin": perfil.link_linkedin,
-                }
-                for perfil in resultado.perfis
-            ],
-            turma_id=turma_id,
-        )
-    except TalentosStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    turma_id = resolver_turma_id(usuario)
+    salvar_talentos(
+        [
+            {
+                "talento_id": perfil.talento_id,
+                "email": perfil.email,
+                "nome": perfil.nome,
+                "semana_numero": perfil.semana_numero,
+                "horas_dedicadas": (
+                    avaliacoes_por_perfil[(perfil.talento_id, perfil.semana_numero)].horas_dedicadas
+                    if (perfil.talento_id, perfil.semana_numero) in avaliacoes_por_perfil
+                    else 0.0
+                ),
+                "autoavaliacao_tecnica": int(round(perfil.media_tecnica)),
+                "autoavaliacao_socioemocional": int(round(perfil.media_socioemocional)),
+                "media_tecnica": perfil.media_tecnica,
+                "media_socioemocional": perfil.media_socioemocional,
+                "fit_vaga": perfil.fit_vaga,
+                "hard_skills": perfil.hard_skills,
+                "soft_skills": perfil.soft_skills,
+                "feedback_case": perfil.feedback_case,
+                "interdependencias": perfil.interdependencias,
+                "ajustes_rota": perfil.ajustes_rota,
+                "rituais_mentoria": perfil.rituais_mentoria,
+                "link_projeto": perfil.link_projeto,
+                "link_linkedin": perfil.link_linkedin,
+            }
+            for perfil in resultado.perfis
+        ],
+        turma_id=turma_id,
+    )
 
     return UploadMetricasResponse(
         arquivo=arquivo.filename or "planilha",

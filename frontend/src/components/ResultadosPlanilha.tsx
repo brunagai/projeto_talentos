@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import AbaAreas from "./AbaAreas";
 import AbaCargos from "./AbaCargos";
@@ -14,7 +14,7 @@ import {
   type CargoReferencia,
   type RankingCandidato,
 } from "./matchmakingUtils";
-import { apiFetch } from "../lib/api";
+import { useCargos } from "../hooks/useCargos";
 
 type AbaAtiva = "cargos" | "areas" | "talentos";
 
@@ -107,41 +107,7 @@ export function ResultadosPlanilha({
   perfis,
 }: ResultadosPlanilhaProps) {
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("cargos");
-  const [cargos, setCargos] = useState<CargoReferencia[]>([]);
-  const [carregandoCargos, setCarregandoCargos] = useState(true);
-  const [erroCargos, setErroCargos] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelado = false;
-
-    async function carregarCargos() {
-      setCarregandoCargos(true);
-      setErroCargos(null);
-      try {
-        const data = await apiFetch<CargoReferencia[]>("/matchmaking/cargos");
-        if (!cancelado) {
-          setCargos(data);
-        }
-      } catch (error) {
-        if (!cancelado) {
-          setErroCargos(
-            error instanceof Error
-              ? error.message
-              : "Erro ao carregar cargos de referência.",
-          );
-        }
-      } finally {
-        if (!cancelado) {
-          setCarregandoCargos(false);
-        }
-      }
-    }
-
-    void carregarCargos();
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  const { cargos, carregando: carregandoCargos, erro: erroCargos } = useCargos();
 
   const rankings = useMemo(
     () => montarRankings(cargos, perfis),

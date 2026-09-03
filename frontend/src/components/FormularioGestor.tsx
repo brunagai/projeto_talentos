@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import Card from "./Card";
+import { AlertErro } from "./AlertErro";
 import {
   ALL_SKILL_KEYS,
   HARD_SKILL_KEYS,
@@ -210,9 +211,9 @@ export function FormularioGestor({
         </div>
 
         {erro && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          <AlertErro className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
             {erro}
-          </p>
+          </AlertErro>
         )}
         {sucesso && (
           <p className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-300">

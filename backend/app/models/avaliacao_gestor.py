@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.exceptions import CompetenciaInvalidaError
+
 
 class AvaliacaoGestorCreate(BaseModel):
     """Dados para registrar a avaliação formal do gestor."""
@@ -23,6 +25,7 @@ class AvaliacaoGestorCreate(BaseModel):
         for grupo, skills in (("hard_skills", self.hard_skills), ("soft_skills", self.soft_skills)):
             for nome, nota in skills.items():
                 if not isinstance(nota, int) or nota < 0 or nota > 5:
-                    raise ValueError(
-                        f"{grupo}.{nome}: nota deve ser inteira entre 0 e 5"
+                    raise CompetenciaInvalidaError(
+                        f"{grupo}.{nome}: nota deve ser inteira entre 0 e 5",
+                        details={"grupo": grupo, "competencia": nome, "nota": nota},
                     )
