@@ -77,11 +77,13 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def require_anon_key_in_production(self) -> "Settings":
+    def warn_missing_anon_key_in_production(self) -> "Settings":
         if self.is_production and not self.SUPABASE_ANON_KEY:
-            raise ValueError(
-                "SUPABASE_ANON_KEY é obrigatória em production "
-                "(request path com RLS — ver docs/TENANCY_E_SERVICE_ROLE.md)."
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "SUPABASE_ANON_KEY ausente em production: request path usa service_role "
+                "(sem RLS). Defina ANON_KEY + JWT Secret alinhado para ativar a Fase F."
             )
         return self
 
