@@ -76,10 +76,6 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    // No Vercel (Services), /api é roteado pelo vercel.json da raiz.
-    if (process.env.VERCEL) {
-      return [];
-    }
     return [
       {
         source: "/api/:path*",
