@@ -1,5 +1,23 @@
 /** @type {import('next').NextConfig} */
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+function resolveApiUrl() {
+  let raw = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim();
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    raw = raw.slice(1, -1).trim();
+  }
+  raw = raw.replace(/\/+$/, "");
+  if (!raw) {
+    return "http://localhost:8000";
+  }
+  if (!/^https?:\/\//i.test(raw)) {
+    raw = `https://${raw}`;
+  }
+  return raw;
+}
+
+const apiUrl = resolveApiUrl();
 const isDev = process.env.NODE_ENV !== "production";
 
 function contentSecurityPolicy() {
